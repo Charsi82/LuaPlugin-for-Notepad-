@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="lua_main.cpp" />
+    <ClCompile Include="lua_npp.cpp" />
+    <ClCompile Include="PluginOptions.cpp" />
+    <ClCompile Include="SysUniConv.cpp">
+      <Filter>plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="DarkMode\DarkMode.cpp">
+      <Filter>DarkMode</Filter>
+    </ClCompile>
+    <ClCompile Include="DarkMode\PluginDarkMode.cpp">
+      <Filter>DarkMode</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lua_main.h" />
+    <ClInclude Include="PluginOptions.h" />
+    <ClInclude Include="PluginSettings.h" />
+    <ClInclude Include="Docking.h">
+      <Filter>plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="helpers.h">
+      <Filter>plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="Notepad_plus_msgs.h">
+      <Filter>plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="Scintilla.h">
+      <Filter>plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="PluginInterface.h">
+      <Filter>plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="DarkMode\DarkMode.h">
+      <Filter>DarkMode</Filter>
+    </ClInclude>
+    <ClInclude Include="DarkMode\DPIManager.h">
+      <Filter>DarkMode</Filter>
+    </ClInclude>
+    <ClInclude Include="DarkMode\IatHook.h">
+      <Filter>DarkMode</Filter>
+    </ClInclude>
+    <ClInclude Include="DarkMode\PluginDarkMode.h">
+      <Filter>DarkMode</Filter>
+    </ClInclude>
+    <ClInclude Include="DarkMode\UAHMenuBar.h">
+      <Filter>DarkMode</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="plugin">
+      <UniqueIdentifier>{692b5e8c-bcda-4ba0-83cf-9d9a8f2feb81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DarkMode">
+      <UniqueIdentifier>{1419d1f5-3c54-4335-9cc0-b30cafc50576}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="lua_npp.rc">
+      <Filter>plugin</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>
