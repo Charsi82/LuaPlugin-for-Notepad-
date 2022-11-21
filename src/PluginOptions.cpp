@@ -2,7 +2,7 @@
 
 CPluginOptions::CPluginOptions() :
 	m_bConsoleOpenOnInit(false), m_bConsoleClearOnRun(false),
-	m_bConsoleAutoclear(false), m_bShowRunTime(false),
+	m_bConsoleAutoclear(false), m_bShowRunTime(false), m_bConEncoding(true),
 	m_uLang0(0), m_uLang(0),
 	m_uInterpType0(LUA51), m_uInterpType(LUA51),
 	m_uFlags0(0), m_uFlags(0),
@@ -23,6 +23,8 @@ BYTE CPluginOptions::getOptFlags() const
 		uFlags |= OPTF_CONAUTOCLEAR;
 	if (m_bShowRunTime)
 		uFlags |= OPTF_PRINTRUNTIME;
+	if (m_bConEncoding)
+		uFlags |= OPTF_CONENCODING;
 	return uFlags;
 }
 
@@ -58,6 +60,7 @@ void CPluginOptions::ReadOptions()
 		m_bConsoleClearOnRun = !!(m_uFlags0 & OPTF_CONCLEARONRUN);
 		m_bConsoleAutoclear = !!(m_uFlags0 & OPTF_CONAUTOCLEAR);
 		m_bShowRunTime = !!(m_uFlags0 & OPTF_PRINTRUNTIME);
+		m_bConEncoding = !!(m_uFlags0 & OPTF_CONENCODING);
 	}
 	GetPrivateProfileString(OptSectName, OptLovePath, L"C:\\Program Files\\LOVE\\love.exe", LovePath, MAX_PATH, szIniFilePath);
 	m_uInterpType0 = GetPrivateProfileInt(OptSectName, OptLuaKey, LUA51, szIniFilePath);

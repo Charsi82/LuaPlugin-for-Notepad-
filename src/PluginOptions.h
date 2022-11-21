@@ -25,6 +25,7 @@ public:
 	bool m_bConsoleClearOnRun;
 	bool m_bConsoleAutoclear;
 	bool m_bShowRunTime;
+	bool m_bConEncoding;
 	BYTE  m_uInterpType; // Lua interpretator type
 
 	void ReadOptions();
@@ -55,7 +56,8 @@ private:
 		OPTF_CONOPENONINIT = 0x01,
 		OPTF_CONCLEARONRUN = 0x02,
 		OPTF_CONAUTOCLEAR = 0x04,
-		OPTF_PRINTRUNTIME = 0x08
+		OPTF_PRINTRUNTIME = 0x08,
+		OPTF_CONENCODING = 0x10
 	};
 	BYTE  m_uFlags0;
 	BYTE  m_uLang;

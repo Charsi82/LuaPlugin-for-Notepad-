@@ -7,13 +7,13 @@
 #define lua_pop(L,n) lua_settop(L, -(n)-1)
 
 extern CLuaManager* LM;
+extern CPluginOptions g_opt;
 
 void print_from_lua(const char* txt)
 {
 	int iSize = strlen(txt);
 	TCHAR* wtmp = new TCHAR[iSize + 1]{};
-	UINT cp = SendNpp(SCI_GETCODEPAGE, 0, 0);
-	SysUniConv::MultiByteToUnicode(wtmp, iSize, txt, iSize, cp);
+	SysUniConv::MultiByteToUnicode(wtmp, iSize, txt, iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
 	AddStr(wtmp);
 	delete[] wtmp;
 }

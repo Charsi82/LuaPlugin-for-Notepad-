@@ -19,8 +19,10 @@
 #define IDC_EDITLOVEPATH                1012
 #define IDC_BUTTON1                     1013
 #define IDC_OFDLOVEPATH                 1013
+#define IDC_CHECKRUNTIME2               1014
+#define IDC_CHECKCONENC                 1014
 #define IDC_CHECKLNG                    1015
-#define ID_COPY							40001
+#define ID_COPY                         40001
 #define ID_COPYSELECTED                 40002
 #define ID_CLEARCONSOLE                 40003
 #define ID_CLOSECONSOLE                 40004

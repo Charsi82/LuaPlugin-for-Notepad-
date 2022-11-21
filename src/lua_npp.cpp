@@ -361,6 +361,8 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 	{
 		SendDlgItemMessage(hw, IDC_CHECKAUTOCLEAR, BM_SETCHECK, g_opt.m_bConsoleAutoclear, 0);
 		SendDlgItemMessage(hw, IDC_CHECKRUNTIME, BM_SETCHECK, g_opt.m_bShowRunTime, 0);
+		SendDlgItemMessage(hw, IDC_CHECKCONENC, BM_SETCHECK, g_opt.m_bConEncoding, 0);
+		SendDlgItemMessage(hw, IDC_CHECKCONENC, WM_SETTEXT, 0, (LPARAM)(g_opt.m_bConEncoding ? L"UTF8" : L"ANSI"));
 		SendDlgItemMessage(hw, IDC_EDITLOVEPATH, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(g_opt.LovePath));
 		BYTE lng = g_opt.GetLang();
 		SendDlgItemMessage(hw, IDC_CHECKLNG, BM_SETCHECK, lng, 0);
@@ -480,6 +482,12 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 		case IDC_CHECKAUTOCLEAR:
 		{
 			g_opt.m_bConsoleAutoclear = !!SendDlgItemMessage(hw, IDC_CHECKAUTOCLEAR, BM_GETCHECK, 0, 0);
+			break;
+		}
+		case IDC_CHECKCONENC:
+		{
+			g_opt.m_bConEncoding = !!SendDlgItemMessage(hw, IDC_CHECKCONENC, BM_GETCHECK, 0, 0);
+			SendDlgItemMessage(hw, IDC_CHECKCONENC, WM_SETTEXT, 0, (LPARAM)(g_opt.m_bConEncoding ? L"UTF8" : L"ANSI"));
 			break;
 		}
 		case IDC_CHECKRUNTIME:
@@ -604,6 +612,51 @@ void ShowPopup(HWND hwndDlg)
 	DestroyMenu(menu);
 }
 
+bool str2Clipboard(const TCHAR* str2cpy, HWND hwnd)
+{
+	size_t len2Allocate = (lstrlen(str2cpy) + 1) * sizeof(TCHAR);
+	HGLOBAL hglbCopy = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, len2Allocate);
+	if (hglbCopy == NULL)
+	{
+		return false;
+	}
+	if (!::OpenClipboard(hwnd))
+	{
+		::GlobalFree(hglbCopy);
+		::CloseClipboard();
+		return false;
+	}
+	//if (!::EmptyClipboard())
+	//{
+	//	::GlobalFree(hglbCopy);
+	//	::CloseClipboard();
+	//	return false;
+	//}
+	// Lock the handle and copy the text to the buffer.
+	TCHAR* pStr = (TCHAR*)::GlobalLock(hglbCopy);
+	if (pStr == NULL)
+	{
+		::GlobalUnlock(hglbCopy);
+		::GlobalFree(hglbCopy);
+		::CloseClipboard();
+		return false;
+	}
+	wcscpy_s(pStr, len2Allocate / sizeof(TCHAR), str2cpy);
+	::GlobalUnlock(hglbCopy);
+	// Place the handle on the clipboard.
+	if (::SetClipboardData(CF_UNICODETEXT, hglbCopy) == NULL)
+	{
+		::GlobalFree(hglbCopy);
+		::CloseClipboard();
+		return false;
+	}
+	if (!::CloseClipboard())
+	{
+		return false;
+	}
+	return true;
+}
+
 void OnCopy(bool selected)
 {
 	HWND hRE = GetConsole();
@@ -611,22 +664,10 @@ void OnCopy(bool selected)
 	TCHAR* tmp = new TCHAR[len]{};
 	GETTEXTEX gtex{};
 	gtex.cb = static_cast<DWORD>(len * sizeof(TCHAR));// size in bytes
-	gtex.codepage = 1200; // for UNICODE
+	gtex.codepage = 1200; // 1200 for UNICODE
 	gtex.flags = selected ? GT_SELECTION : GT_DEFAULT;
 	SendMessage(hRE, EM_GETTEXTEX, (WPARAM)&gtex, (LPARAM)tmp);
-	if (OpenClipboard(execData.hConsole)) {
-		HGLOBAL hand = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, len);
-		if (hand) {
-			EmptyClipboard();
-			TCHAR* ptr = static_cast<TCHAR*>(GlobalLock(hand));
-			if (ptr) {
-				memcpy(ptr, tmp, len);
-				GlobalUnlock(hand);
-			}
-			SetClipboardData(CF_UNICODETEXT, hand);
-		}
-		CloseClipboard();
-	}
+	str2Clipboard(tmp, execData.hConsole);
 	delete[] tmp;
 }
 
