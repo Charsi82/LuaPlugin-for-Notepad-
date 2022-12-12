@@ -22,6 +22,7 @@ const TCHAR path_lua54[] = L"lua54.dll";
 const TCHAR path_luajit[] = L"luajit.dll";
 static TCHAR ConsoleCaption[20]{};
 static BYTE is_floating = 8;
+static bool clr_choose_shown = false;
 
 enum class ColorMode {
 	NORMAL,
@@ -350,9 +351,9 @@ void SetLangOptDialog(HWND hw, BYTE lng)
 	SendDlgItemMessage(hw, ID_BTNRESET, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L"Default" : L"По умолчанию"));
 	SendDlgItemMessage(hw, IDC_CHECKAUTOCLEAR, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L" Autoclean Console" : L" Автоочистка консоли"));
 	SendDlgItemMessage(hw, IDC_CHECKRUNTIME, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L" Print run time" : L" Время выполнения"));
+	SendDlgItemMessage(hw, IDC_STATIC_RTQ, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L"Runtime quote (in seconds):" : L"Лимит времени выполнения (в секундах):"));
 }
 
-bool clr_choose_shown = false;
 INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 {
 	switch (msg)
@@ -364,6 +365,9 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 		SendDlgItemMessage(hw, IDC_CHECKCONENC, BM_SETCHECK, g_opt.m_bConEncoding, 0);
 		SendDlgItemMessage(hw, IDC_CHECKCONENC, WM_SETTEXT, 0, (LPARAM)(g_opt.m_bConEncoding ? L"UTF8" : L"ANSI"));
 		SendDlgItemMessage(hw, IDC_EDITLOVEPATH, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(g_opt.LovePath));
+		SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETRANGE32, 0, 15);
+		SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETPOS32, 0, g_opt.timequote);
+
 		BYTE lng = g_opt.GetLang();
 		SendDlgItemMessage(hw, IDC_CHECKLNG, BM_SETCHECK, lng, 0);
 		SetLangOptDialog(hw, lng);
@@ -513,6 +517,12 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 			EnableMenuItem(execData.hMenu, funcItems[RunLove2D]._cmdID, MF_BYCOMMAND | MF_ENABLED);
 			break;
 		}
+		case IDC_QUOTEEDIT:
+		{
+			if (IsWindowVisible(hw))
+				g_opt.timequote = GetDlgItemInt(hw, IDC_QUOTEEDIT, 0, 0);
+			break;
+		}
 		case IDC_CHECKLNG:
 		{
 			g_opt.OnSwitchLang();
@@ -525,6 +535,7 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 			g_opt.clrOKdm = DEFCOLORDMOK;
 			g_opt.clrERR = DEFCOLORERR;
 			g_opt.clrERRdm = DEFCOLORDMERR;
+			SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETPOS32, 0, 3);
 			InvalidateRect(hw, nullptr, TRUE); // redraw
 			break;
 		}

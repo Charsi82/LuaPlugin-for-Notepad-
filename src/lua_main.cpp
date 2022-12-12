@@ -251,9 +251,28 @@ int CLuaManager::process(const char* fpath, bool run)
 	}
 	char lua_code[1024]{}; // todo with pushvfstring
 	if (run)
-		sprintf_s(lua_code, "local res,err = pcall(dofile,[[%s]]) if res then return 0 end print(err) return tonumber(err:match(':(%s):')) or -1", fpath, "%d+");
+		sprintf_s(lua_code, "\
+local quote = %d \
+if quote>0 then \
+	local tm = os.clock() \
+	local function hook() \
+		if os.clock() - tm > quote then \
+			debug.sethook() \
+			error('quote in '..quote..' seconds exceeded', 2) \
+		end \
+	end \
+	debug.sethook(hook, '', 1000000) \
+end \
+local res, err = pcall(dofile,[[%s]]) \
+if quote>0 then debug.sethook() end \
+if res then return 0 end \
+print(err) \
+return tonumber(err:match(':(%s):')) or -1", g_opt.timequote, fpath, "%d+"); // 3 is time quote
 	else
-		sprintf_s(lua_code, "local res,err = loadfile([[%s]]) if res then print([[%s - syntax OK]]) return 0 end print(err) return tonumber(err:match(':(%s):')) or -1", fpath, fpath, "%d+");
+		sprintf_s(lua_code, "\
+local res, err = loadfile([[%s]]) \
+if res then print([[%s - syntax OK]]) return 0 end \
+print(err) return tonumber(err:match(':(%s):')) or -1", fpath, fpath, "%d+");
 	m_lua_getglobal(L, (intrp_type == LUA51) ? "loadstring" : "load");
 	lua_pushstring(L, lua_code);
 	m_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring

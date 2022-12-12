@@ -5,7 +5,7 @@ CPluginOptions::CPluginOptions() :
 	m_bConsoleAutoclear(false), m_bShowRunTime(false), m_bConEncoding(true),
 	m_uLang0(0), m_uLang(0),
 	m_uInterpType0(LUA51), m_uInterpType(LUA51),
-	m_uFlags0(0), m_uFlags(0),
+	m_uFlags0(0), m_uFlags(0), timequote(3),
 	clrOKdm(0), clrOK(0), clrERRdm(0), clrERR(0)
 {
 	ZeroMemory(szIniFilePath, MAX_PATH);
@@ -62,6 +62,7 @@ void CPluginOptions::ReadOptions()
 		m_bShowRunTime = !!(m_uFlags0 & OPTF_PRINTRUNTIME);
 		m_bConEncoding = !!(m_uFlags0 & OPTF_CONENCODING);
 	}
+	timequote = GetPrivateProfileInt(OptSectName, OptTimeQuoteKey, 3, szIniFilePath);
 	GetPrivateProfileString(OptSectName, OptLovePath, L"C:\\Program Files\\LOVE\\love.exe", LovePath, MAX_PATH, szIniFilePath);
 	m_uInterpType0 = GetPrivateProfileInt(OptSectName, OptLuaKey, LUA51, szIniFilePath);
 	m_uInterpType = m_uInterpType0;
@@ -103,6 +104,8 @@ void CPluginOptions::SaveOptions()
 	WritePrivateProfileString(OptSectName, OptClrERRKey, szNum, szIniFilePath);
 	wsprintf(szNum, hexfmt, clrERRdm);
 	WritePrivateProfileString(OptSectName, OptClrERRDarkKey, szNum, szIniFilePath);
+	wsprintf(szNum, L"%d", timequote);
+	WritePrivateProfileString(OptSectName, OptTimeQuoteKey, szNum, szIniFilePath);
 }
 
 void CPluginOptions::OnSwitchLang()

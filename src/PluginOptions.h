@@ -10,6 +10,7 @@ constexpr auto OptClrOKKey = L"colorOK";
 constexpr auto OptClrOKDarkKey = L"colorOK_dark";
 constexpr auto OptClrERRKey = L"colorERR";
 constexpr auto OptClrERRDarkKey = L"colorERR_dark";
+constexpr auto OptTimeQuoteKey = L"TimeQuote";
 
 const COLORREF DEFCOLOROK = 0x008000;
 const COLORREF DEFCOLORDMOK = 0x00FA0A;
@@ -39,7 +40,7 @@ public:
 	void ApplyLang();
 	BYTE m_uFlags;
 	TCHAR LovePath[MAX_PATH];
-
+	int timequote;
 	COLORREF clrOKdm;
 	COLORREF clrOK;
 	COLORREF clrERRdm;
