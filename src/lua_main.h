@@ -55,6 +55,7 @@ public:
 	~CLuaManager();
 	void reset_lib(const TCHAR*, BYTE);
 	void print();
+	void set_textcolor();
 	void list_files();
 	void msgbox();
 	int process(const char*, bool = false);

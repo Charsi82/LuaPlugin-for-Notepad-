@@ -9,6 +9,11 @@
 extern CLuaManager* LM;
 extern CPluginOptions g_opt;
 
+void SetConsoleColor(COLORREF color);
+COLORREF GetERRColor();
+COLORREF GetOKColor();
+COLORREF GetNormalColor();
+
 void print_from_lua(const char* txt)
 {
 	int iSize = strlen(txt);
@@ -119,6 +124,39 @@ void CLuaManager::print()
 	print_from_lua("\r\n");
 }
 
+void CLuaManager::set_textcolor()
+{
+	unsigned int r = 0, g = 0, b = 0;
+	const char* clrs = lua_tolstring(L, 1, 0);
+	sscanf_s(clrs, "#%02x%02x%02x", &r, &g, &b);
+	SetConsoleColor(RGB(r, g, b));
+	lua_settop(L, 0);
+}
+
+int luafunc_settextcolor(void* L)
+{
+	LM->set_textcolor();
+	return 0;
+}
+
+int luafunc_set_err_color(void* L)
+{
+	SetConsoleColor(GetERRColor());
+	return 0;
+}
+
+int luafunc_set_ok_color(void* L)
+{
+	SetConsoleColor(GetOKColor());
+	return 0;
+}
+
+int luafunc_set_normal_color(void* L)
+{
+	SetConsoleColor(GetNormalColor());
+	return 0;
+}
+
 void CLuaManager::reset_lib(const TCHAR* dll_name, BYTE lib_type)
 {
 	intrp_type = lib_type;
@@ -180,6 +218,10 @@ void CLuaManager::reset_lib(const TCHAR* dll_name, BYTE lib_type)
 		LUAREG(L, "print", luafunc_print);
 		LUAREG(L, "list_files", luafunc_list_files);
 		LUAREG(L, "lua_help", luafunc_luahelp);
+		LUAREG(L, "set_text_color", luafunc_settextcolor);
+		LUAREG(L, "set_err_color", luafunc_set_err_color);
+		LUAREG(L, "set_ok_color", luafunc_set_ok_color);
+		LUAREG(L, "set_normal_color", luafunc_set_normal_color);
 	}
 	else
 	{
@@ -266,13 +308,20 @@ end \
 local res, err = pcall(dofile,[[%s]]) \
 if quote>0 then debug.sethook() end \
 if res then return 0 end \
+set_err_color() \
 print(err) \
 return tonumber(err:match(':(%s):')) or -1", g_opt.timequote, fpath, "%d+"); // 3 is time quote
 	else
 		sprintf_s(lua_code, "\
 local res, err = loadfile([[%s]]) \
-if res then print([[%s - syntax OK]]) return 0 end \
-print(err) return tonumber(err:match(':(%s):')) or -1", fpath, fpath, "%d+");
+if res then \
+	set_ok_color() \
+	print([[%s - syntax OK]]) \
+	return 0 \
+end \
+set_err_color() \
+print(err) \
+return tonumber(err:match(':(%s):')) or -1", fpath, fpath, "%d+");
 	m_lua_getglobal(L, (intrp_type == LUA51) ? "loadstring" : "load");
 	lua_pushstring(L, lua_code);
 	m_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring

@@ -23,14 +23,7 @@ const TCHAR path_luajit[] = L"luajit.dll";
 static TCHAR ConsoleCaption[20]{};
 static BYTE is_floating = 8;
 static bool clr_choose_shown = false;
-
-enum class ColorMode {
-	NORMAL,
-	OK,
-	ERR
-};
-
-static ColorMode ColorModeState = ColorMode::NORMAL;
+static COLORREF current_color = 0;
 
 FuncItem funcItems[nbFunc];
 
@@ -39,7 +32,6 @@ bool file_exist(const TCHAR* dll_name)
 	TCHAR lua_dll[MAX_PATH]{};
 	UINT nLen = GetModuleFileName((HMODULE)execData.hNPP, lua_dll, MAX_PATH);
 	while (nLen > 0 && lua_dll[nLen] != L'\\') lua_dll[nLen--] = 0;
-	//lstrcpy(lua_dll, dll_name);
 	lstrcat(lua_dll, dll_name);
 	return PathFileExists(lua_dll);
 }
@@ -64,7 +56,7 @@ LRESULT SendSci(UINT iMessage, WPARAM wParam, LPARAM lParam)
 	return SendMessage(GetCurrentScintilla(), iMessage, wParam, lParam);
 }
 
-void SetCharFormat(COLORREF color = RGB(0, 0, 0), DWORD dwMask = CFM_COLOR, DWORD dwEffects = 0, DWORD dwOptions = SCF_ALL)
+/*void SetCharFormat(COLORREF color = RGB(0, 0, 0), DWORD dwMask = CFM_COLOR, DWORD dwEffects = 0, DWORD dwOptions = SCF_ALL)
 {
 	CHARFORMAT cf{};
 	cf.cbSize = sizeof(cf);
@@ -72,22 +64,29 @@ void SetCharFormat(COLORREF color = RGB(0, 0, 0), DWORD dwMask = CFM_COLOR, DWOR
 	cf.dwEffects = dwEffects;
 	cf.crTextColor = color;
 	SendMessage(GetConsole(), EM_SETCHARFORMAT, dwOptions, (LPARAM)&cf);
+}*/
+
+void SetConsoleColor(COLORREF color)
+{
+	current_color = color;
 }
 
-void SetConsoleTextColor()
+COLORREF GetOKColor()
 {
 	const bool isDM = SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
-	switch (ColorModeState)
-	{
-	case ColorMode::OK:
-		SetCharFormat(isDM ? g_opt.clrOKdm : g_opt.clrOK);
-		break;
-	case ColorMode::ERR:
-		SetCharFormat(isDM ? g_opt.clrERRdm : g_opt.clrERR);
-		break;
-	default:
-		SetCharFormat(isDM ? PluginDarkMode::getTextColor() : GetSysColor(COLOR_MENUTEXT));
-	}
+	return isDM ? g_opt.clrOKdm : g_opt.clrOK;
+}
+
+COLORREF GetERRColor()
+{
+	const bool isDM = SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
+	return isDM ? g_opt.clrERRdm : g_opt.clrERR;
+}
+
+COLORREF GetNormalColor()
+{
+	const bool isDM = SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
+	return isDM ? PluginDarkMode::getTextColor() : GetSysColor(COLOR_MENUTEXT);
 }
 
 void OnLove2D()
@@ -122,7 +121,6 @@ void ResetConsoleColors()
 		SendNpp(NPPM_ISDARKMODEENABLED, 0, 0) ?
 		PluginDarkMode::getSofterBackgroundColor() :
 		GetSysColor(COLOR_MENU));
-	SetConsoleTextColor();
 }
 
 void ResetItemCheck()
@@ -363,7 +361,7 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 		SendDlgItemMessage(hw, IDC_CHECKAUTOCLEAR, BM_SETCHECK, g_opt.m_bConsoleAutoclear, 0);
 		SendDlgItemMessage(hw, IDC_CHECKRUNTIME, BM_SETCHECK, g_opt.m_bShowRunTime, 0);
 		SendDlgItemMessage(hw, IDC_CHECKCONENC, BM_SETCHECK, g_opt.m_bConEncoding, 0);
-		SendDlgItemMessage(hw, IDC_CHECKCONENC, WM_SETTEXT, 0, (LPARAM)(g_opt.m_bConEncoding ? L"UTF8" : L"ANSI"));
+		SendDlgItemMessage(hw, IDC_CHECKCONENC, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(g_opt.m_bConEncoding ? L"UTF8" : L"ANSI"));
 		SendDlgItemMessage(hw, IDC_EDITLOVEPATH, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(g_opt.LovePath));
 		SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETRANGE32, 0, 15);
 		SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETPOS32, 0, g_opt.timequote);
@@ -491,7 +489,7 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 		case IDC_CHECKCONENC:
 		{
 			g_opt.m_bConEncoding = !!SendDlgItemMessage(hw, IDC_CHECKCONENC, BM_GETCHECK, 0, 0);
-			SendDlgItemMessage(hw, IDC_CHECKCONENC, WM_SETTEXT, 0, (LPARAM)(g_opt.m_bConEncoding ? L"UTF8" : L"ANSI"));
+			SendDlgItemMessage(hw, IDC_CHECKCONENC, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(g_opt.m_bConEncoding ? L"UTF8" : L"ANSI"));
 			break;
 		}
 		case IDC_CHECKRUNTIME:
@@ -557,7 +555,7 @@ void OnOptions()
 void OnShowAboutDlg()
 {
 	TCHAR txt[] =
-		L" Lua plugin v2.3.4 "
+		L" Lua plugin v2.3.5 "
 #ifdef _WIN64
 		L"(64-bit)"
 #else
@@ -575,7 +573,7 @@ void OpenCloseConsole()
 {
 	g_opt.m_bConsoleOpenOnInit = !g_opt.m_bConsoleOpenOnInit;
 	SendNpp(NPPM_SETMENUITEMCHECK, funcItems[ShowHideConsole]._cmdID, g_opt.m_bConsoleOpenOnInit);
-	SendNpp(g_opt.m_bConsoleOpenOnInit ? NPPM_DMMSHOW : NPPM_DMMHIDE, 0, execData.hConsole);
+	SendNpp(g_opt.m_bConsoleOpenOnInit ? NPPM_DMMSHOW : NPPM_DMMHIDE, NULL, execData.hConsole);
 
 	// DarkMode support
 	if (g_opt.m_bConsoleOpenOnInit)
@@ -589,10 +587,7 @@ HWND GetConsole()
 
 void OnClearConsole()
 {
-	HWND hRE = GetConsole();
-	size_t ndx = GetWindowTextLength(hRE);
-	SendMessage(hRE, EM_SETSEL, 0, ndx);
-	SendMessage(hRE, EM_REPLACESEL, 0, (LPARAM)L"");
+	SetWindowText(GetConsole(), NULL);
 	bNeedClear = false;
 }
 
@@ -677,7 +672,7 @@ void OnCopy(bool selected)
 	gtex.cb = static_cast<DWORD>(len * sizeof(TCHAR));// size in bytes
 	gtex.codepage = 1200; // 1200 for UNICODE
 	gtex.flags = selected ? GT_SELECTION : GT_DEFAULT;
-	SendMessage(hRE, EM_GETTEXTEX, (WPARAM)&gtex, (LPARAM)tmp);
+	SendMessage(hRE, EM_GETTEXTEX, reinterpret_cast<WPARAM>(&gtex), reinterpret_cast<LPARAM>(tmp));
 	str2Clipboard(tmp, execData.hConsole);
 	delete[] tmp;
 }
@@ -700,7 +695,7 @@ BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM l
 				is_floating = 8;
 				break;
 			case DMN_DOCK:  // docking dialog; HIWORD(pnmh->code) is dockstate [0..3]
-				is_floating = (BYTE)HIWORD(pnmh->code);
+				is_floating = static_cast<BYTE>(HIWORD(pnmh->code));
 				break;
 			}
 		}
@@ -735,13 +730,44 @@ BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM l
 	return FALSE;
 }
 
+void ColorizeLine(COLORREF clr, int from = 0, int to = 0)
+{
+	HWND hRE = GetConsole();
+	int ndx = GetWindowTextLength(hRE);
+	if (from == 0) from = static_cast<int>(SendMessage(hRE, EM_LINEFROMCHAR, ndx, 0));
+	if (to == 0) { to = from + 1; }
+	auto ofs1 = SendMessage(hRE, EM_LINEINDEX, from, 0);
+	auto ofs2 = SendMessage(hRE, EM_LINEINDEX, to, 0);
+	SendMessage(hRE, EM_SETSEL, ofs1, ofs2);
+	// set color for selection
+	CHARFORMAT cf{};
+	cf.cbSize = sizeof(cf);
+	cf.dwMask = CFM_COLOR;
+	cf.dwEffects = 0;
+	cf.crTextColor = clr;
+	SendMessage(GetConsole(), EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&cf));
+}
+
 void AddStr(TCHAR* msg)
 {
 	if (!msg) return;
 	HWND hRE = GetConsole();
 	int ndx = GetWindowTextLength(hRE);
+	int line_from = static_cast<int>(SendMessage(hRE, EM_LINEFROMCHAR, ndx, 0));
+
+	// clear selection
 	SendMessage(hRE, EM_SETSEL, ndx, ndx);
-	SendMessage(hRE, EM_REPLACESEL, 0, (LPARAM)msg);
+
+	// set text
+	SendMessage(hRE, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>(msg));
+
+	// select added text
+	ndx = GetWindowTextLength(hRE);
+	int line_to = static_cast<int>(SendMessage(hRE, EM_LINEFROMCHAR, ndx, 0));
+	ColorizeLine(current_color, line_from, line_to + 1);
+
+	// move to end and clear slection
+	SendMessage(hRE, EM_SETSEL, ndx, ndx);
 }
 
 //void OnPrintTime()
@@ -770,15 +796,12 @@ bool not_valid_document(const TCHAR* ws_full_path)
 
 void AddMarker(int line)
 {
-	const bool stat = line == 0;
-	bNeedClear = true;
-	if (stat) return;
-	ColorModeState = ColorMode::ERR;
-	line--;
+	--line;
 	SendSci(SCI_GOTOLINE, line);
 	//SendSci(SCI_SETEMPTYSELECTION);
-	SendSci(SCI_MARKERDELETE, line, SC_MARK_ARROWS); // remove mark if added
-	SendSci(SCI_MARKERADD, line, SC_MARK_ARROWS);
+	const int marker_type = SC_MARK_CIRCLEMINUS; /* SC_MARK_ARROWS */
+	SendSci(SCI_MARKERDELETE, line, marker_type); // remove mark if added
+	SendSci(SCI_MARKERADD, line, marker_type);
 	SetFocus(GetCurrentScintilla());
 }
 
@@ -794,9 +817,8 @@ void OnCheckSyntax()
 	char full_path[MAX_PATH];
 	SysUniConv::UnicodeToMultiByte(full_path, MAX_PATH, ws_full_path);
 	int line = LM->process(full_path);
-	ColorModeState = ColorMode::OK;
-	AddMarker(line);
-	SetConsoleTextColor();
+	bNeedClear = true;
+	if (line > 0) AddMarker(line);
 }
 
 void OnRunScript()
@@ -812,17 +834,18 @@ void OnRunScript()
 	SysUniConv::UnicodeToMultiByte(full_path, MAX_PATH, ws_full_path);
 
 	clock_t run_time = clock();
-	int rslt = LM->process(full_path, true);
+	int line = LM->process(full_path, true);
 	run_time = clock() - run_time;
 
-	ColorModeState = ColorMode::NORMAL;
-	AddMarker(rslt);
-	if (!rslt)
+	bNeedClear = true;
+	if (line > 0) AddMarker(line);
+	if (!line)
 	{
 		TCHAR str[MAX_PATH]{};
 		SYSTEMTIME sTime;
 		GetLocalTime(&sTime);
 
+		SetConsoleColor(GetNormalColor());
 		wsprintf(str, L"Success: %02d:%02d:%02d", sTime.wHour, sTime.wMinute, sTime.wSecond);
 		AddStr(str);
 
@@ -834,7 +857,6 @@ void OnRunScript()
 
 		bNeedClear = false;
 	}
-	SetConsoleTextColor();
 }
 
 void OnCheckFiles()
@@ -866,14 +888,14 @@ void OnCheckFiles()
 			char full_filepath[MAX_PATH]{};
 			SysUniConv::UnicodeToMultiByte(full_filepath, MAX_PATH, ws_full_filepath);
 			bool isOK = !LM->process(full_filepath);
+			ColorizeLine(isOK ? GetOKColor() : GetERRColor());
 			stat = stat && isOK;
 			if (!isOK) _cnt++;
 		} while (FindNextFile(h, &f));
 
+		SetConsoleColor(GetNormalColor());
 		wsprintf(ws_full_filepath, L"\r\nDone! Found %d file(s) with errors.", _cnt);
 		AddStr(ws_full_filepath);
-		ColorModeState = stat ? ColorMode::OK : ColorMode::ERR;
-		SetConsoleTextColor();
 	}
 }
 #ifdef TEST_ITEM
@@ -916,7 +938,7 @@ DllMain(HANDLE hModule, DWORD  reasonForCall, LPVOID lpReserved)
 #ifdef TEST_ITEM
 		InitFuncItem(TestItem, loc_ru[TestItem], OnTestItem);
 #endif
-		m_hRichEditDll = LoadLibrary(L"Riched20.dll");
+		m_hRichEditDll = LoadLibrary(L"Riched32.dll");
 		break;
 
 	case DLL_PROCESS_DETACH:
