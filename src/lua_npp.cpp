@@ -344,12 +344,13 @@ COLORREF start_colorgialog(COLORREF clr)
 
 void SetLangOptDialog(HWND hw, BYTE lng)
 {
-	SendMessage(hw, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? loc_en[14] : loc_ru[14]));
-	SendDlgItemMessage(hw, IDC_CHECKLNG, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L"RU \\ ENG" : L"ENG \\ RU"));
-	SendDlgItemMessage(hw, ID_BTNRESET, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L"Default" : L"По умолчанию"));
-	SendDlgItemMessage(hw, IDC_CHECKAUTOCLEAR, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L" Autoclean Console" : L" Автоочистка консоли"));
-	SendDlgItemMessage(hw, IDC_CHECKRUNTIME, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L" Print run time" : L" Время выполнения"));
-	SendDlgItemMessage(hw, IDC_STATIC_RTQ, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? L"Runtime quote (in seconds):" : L"Лимит времени выполнения (в секундах):"));
+	SendMessage(hw, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(lng ? loc_en[13] : loc_ru[13]));
+	auto loc = lng ? loc_items_eng : loc_items_ru;
+	SendDlgItemMessage(hw, IDC_CHECKLNG, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(loc[0]));
+	SendDlgItemMessage(hw, ID_BTNRESET, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(loc[1]));
+	SendDlgItemMessage(hw, IDC_CHECKAUTOCLEAR, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(loc[2]));
+	SendDlgItemMessage(hw, IDC_CHECKRUNTIME, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(loc[3]));
+	SendDlgItemMessage(hw, IDC_STATIC_RTQ, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(loc[4]));
 }
 
 INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)

@@ -135,7 +135,26 @@ static TCHAR* loc_en[nbFunc] =
 //	L"Change language(ENG\\RU)",
 	L"Options",
 	L"About",
+	
 #ifdef TEST_ITEM
 	L"test",
 #endif
+};
+
+static TCHAR* loc_items_ru[] =
+{
+	L"ENG \\ RU",
+	L"По умолчанию",
+	L"Автоочистка консоли",
+	L"Время выполнения",
+	L"Лимит времени выполнения (в секундах):",
+};
+
+static TCHAR* loc_items_eng[] =
+{
+	L"RU \\ ENG",
+	L"Default",
+	L"Autoclean Console",
+	L"Print elapsed time",
+	L"Runtime quote (in seconds):",
 };

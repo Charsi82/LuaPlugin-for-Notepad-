@@ -16,7 +16,7 @@ COLORREF GetNormalColor();
 
 void print_from_lua(const char* txt)
 {
-	int iSize = strlen(txt);
+	size_t iSize = strlen(txt);
 	TCHAR* wtmp = new TCHAR[iSize + 1]{};
 	SysUniConv::MultiByteToUnicode(wtmp, iSize, txt, iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
 	AddStr(wtmp);
