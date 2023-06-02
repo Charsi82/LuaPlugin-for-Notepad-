@@ -18,7 +18,7 @@ void print_from_lua(const char* txt)
 {
 	size_t iSize = strlen(txt);
 	TCHAR* wtmp = new TCHAR[iSize + 1]{};
-	SysUniConv::MultiByteToUnicode(wtmp, iSize, txt, iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
+	SysUniConv::MultiByteToUnicode(wtmp, (int)iSize, txt, (int)iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
 	AddStr(wtmp);
 	delete[] wtmp;
 }
@@ -37,18 +37,20 @@ void CLuaManager::msgbox()
 	case 1:
 		res = MessageBoxA(NULL, lua_tolstring(L, 1, 0), "", MB_OK);
 		break;
+
 	case 2:
 		res = MessageBoxA(NULL, lua_tolstring(L, 1, 0), lua_tolstring(L, 2, 0), MB_OK);
 		break;
+
 	default:
 		const char* icon = lua_tolstring(L, 3, 0);
 		UINT icon_type = MB_OK;
-		if (strstr(icon, "error")) icon_type |= MB_ICONERROR;
-		if (strstr(icon, "warning")) icon_type |= MB_ICONWARNING;
-		if (strstr(icon, "info")) icon_type |= MB_ICONINFORMATION;
-		if (strstr(icon, "question")) icon_type |= MB_ICONQUESTION;
-		if (strstr(icon, "yesnocancel")) icon_type |= MB_YESNOCANCEL;
-		else if (strstr(icon, "yesno")) icon_type |= MB_YESNO;
+		if (strstr(icon, "error"))		icon_type |= MB_ICONERROR;
+		if (strstr(icon, "warning"))	icon_type |= MB_ICONWARNING;
+		if (strstr(icon, "info"))		icon_type |= MB_ICONINFORMATION;
+		if (strstr(icon, "question"))	icon_type |= MB_ICONQUESTION;
+		if (strstr(icon, "yesnocancel"))icon_type |= MB_YESNOCANCEL;
+		else if (strstr(icon, "yesno"))	icon_type |= MB_YESNO;
 		res = MessageBoxA(NULL, lua_tolstring(L, 1, 0), lua_tolstring(L, 2, 0), icon_type);
 	}
 	lua_pushinteger(L, res);
@@ -88,7 +90,8 @@ void CLuaManager::list_files()
 	if (h != INVALID_HANDLE_VALUE)
 	{
 		int i = 1;
-		do {
+		do
+		{
 			lua_pushstring(L, f.cFileName);
 			lua_rawseti(L, -2, i++);
 		} while (FindNextFileA(h, &f));
@@ -237,28 +240,28 @@ CLuaManager::~CLuaManager()
 	if (hinstLib) FreeLibrary(hinstLib);
 }
 
-void CLuaManager::m_lua_call(void* L, int narg, int nret)
+void CLuaManager::m_lua_call(void* _L, int narg, int nret)
 {
-	if (lua_type(L, -narg - 1) != 6 /*LUA_TFUNCTION*/) {
+	if (lua_type(_L, -narg - 1) != 6 /*LUA_TFUNCTION*/) {
 		MessageBox(NULL, L"try to call non function object", L"Error", MB_OK);
 		return;
 	}
 	if (intrp_type == LUA51)
-		lua_call(L, narg, nret);
+		lua_call(_L, narg, nret);
 	else
-		lua_callk(L, narg, nret, 0, NULL);
+		lua_callk(_L, narg, nret, 0, NULL);
 }
 
-int CLuaManager::m_lua_pcall(void* L, int narg, int nret)
+int CLuaManager::m_lua_pcall(void* _L, int narg, int nret)
 {
-	if (lua_type(L, -narg - 1) != 6 /*LUA_TFUNCTION*/) {
+	if (lua_type(_L, -narg - 1) != 6 /*LUA_TFUNCTION*/) {
 		MessageBox(NULL, L"try to call non function object", L"Error", MB_OK);
 		return 0;
 	}
 	if (intrp_type == LUA51)
-		return lua_pcall(L, narg, nret, 0);
+		return lua_pcall(_L, narg, nret, 0);
 	else
-		return lua_pcallk(L, narg, nret, 0, 0, NULL);
+		return lua_pcallk(_L, narg, nret, 0, 0, NULL);
 }
 
 void CLuaManager::m_lua_getglobal(void* _L, const char* name)

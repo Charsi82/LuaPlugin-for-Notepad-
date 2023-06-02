@@ -53,7 +53,7 @@ void CPluginOptions::ReadOptions()
 	lstrcat(szIniFilePath, L"\\");
 	lstrcat(szIniFilePath, m_szDllFileName);
 
-	m_uFlags0 = GetPrivateProfileInt(OptSectName, OptFlagsKey, -1, szIniFilePath);
+	m_uFlags0 = (BYTE)GetPrivateProfileInt(OptSectName, OptFlagsKey, -1, szIniFilePath);
 	if (m_uFlags0 != (BYTE)-1)
 	{
 		m_bConsoleOpenOnInit = !!(m_uFlags0 & OPTF_CONOPENONINIT);
@@ -64,9 +64,9 @@ void CPluginOptions::ReadOptions()
 	}
 	timequote = GetPrivateProfileInt(OptSectName, OptTimeQuoteKey, 3, szIniFilePath);
 	GetPrivateProfileString(OptSectName, OptLovePath, L"C:\\Program Files\\LOVE\\love.exe", LovePath, MAX_PATH, szIniFilePath);
-	m_uInterpType0 = GetPrivateProfileInt(OptSectName, OptLuaKey, LUA51, szIniFilePath);
+	m_uInterpType0 = (BYTE)GetPrivateProfileInt(OptSectName, OptLuaKey, LUA51, szIniFilePath);
 	m_uInterpType = m_uInterpType0;
-	m_uLang0 = GetPrivateProfileInt(OptSectName, OptLangKey, 0, szIniFilePath);
+	m_uLang0 = (BYTE)GetPrivateProfileInt(OptSectName, OptLangKey, 0, szIniFilePath);
 	m_uLang = m_uLang0;
 	clrOK = GetPrivateProfileInt(OptSectName, OptClrOKKey, DEFCOLOROK, szIniFilePath);
 	clrOKdm = GetPrivateProfileInt(OptSectName, OptClrOKDarkKey, DEFCOLORDMOK, szIniFilePath);
@@ -80,7 +80,7 @@ void CPluginOptions::SaveOptions()
 	TCHAR szNum[10]{};
 	if (MustBeSaved())
 	{
-		UINT  uFlags = getOptFlags();
+		BYTE uFlags = getOptFlags();
 		wsprintf(szNum, L"%u", uFlags);
 		if (WritePrivateProfileString(OptSectName, OptFlagsKey, szNum, szIniFilePath))
 			m_uFlags0 = uFlags;

@@ -472,7 +472,7 @@ namespace PluginDarkMode
 
 	bool colorizeBitmap(HBITMAP image, COLORREF color, WORD extraLuminance)
 	{
-		struct { BITMAPINFO info = {}; RGBQUAD moreColors[255]; } bmi;
+		struct { BITMAPINFO info = {}; RGBQUAD moreColors[255]{}; } bmi;
 		BITMAPINFOHEADER& bmh = bmi.info.bmiHeader;
 		BITMAP bm = {};
 
@@ -529,11 +529,11 @@ namespace PluginDarkMode
 				srcS = s;
 				if (extraLuminance > 0 && a > 0)
 					srcL += extraLuminance;
-				COLORREF colorRes = ColorHLSToRGB(srcH, srcL, srcS);
+				const COLORREF colorRes2 = ColorHLSToRGB(srcH, srcL, srcS);
 
-				data[3] = GetRValue(colorRes);
-				data[2] = GetGValue(colorRes);
-				data[1] = GetBValue(colorRes);
+				data[3] = GetRValue(colorRes2);
+				data[2] = GetGValue(colorRes2);
+				data[1] = GetBValue(colorRes2);
 				data += 4;
 			}
 			rowData += stride;
@@ -1838,7 +1838,7 @@ namespace PluginDarkMode
 		bool vItemPressed = false, vItemFocused = false;
 		if (clickableHeaderStyle)
 		{
-			int iComboStateID = 0;
+			//int iComboStateID = 0;
 
 			// Fix hit test bug with mouse position and parent scrolling
 			vItemFocused = headerHitTest.iItem == itemID && mousePosition.x >= parentScrollPos &&
@@ -1987,7 +1987,7 @@ namespace PluginDarkMode
 		}
 
 		// Process caption text.
-		constexpr const int margins = 10;
+		//constexpr const int margins = 10;
 		if (buffer[0] != 0)
 		{
 			if (szTxtOutput.cx > szTxtRect.cx)
@@ -2049,7 +2049,7 @@ namespace PluginDarkMode
 
 		// Draw separator line
 		auto hOldPen = static_cast<HPEN>(::SelectObject(hdc, PluginDarkMode::getEdgePen()));
-		POINT edges[] = {
+		const POINT edges[] = {
 			{rcItem.right - _dpiManager.scaleX(1), rcItem.top},
 			{rcItem.right - _dpiManager.scaleX(1), rcItem.bottom}
 		};
@@ -2068,11 +2068,11 @@ namespace PluginDarkMode
 			headerItem.lastDropDownTrackWasHot = PtInRect(&dropDownRc, mousePosition);
 			headerItem.drawComboArrow(hdc, dropDownRc, headerItem.lastDropDownTrackWasHot);
 			::SelectObject(hdc, PluginDarkMode::getEdgePen());
-			POINT edges[] = {
+			const POINT edges2[] = {
 				{dropDownRc.left, rcItem.top},
 				{dropDownRc.left, rcItem.bottom}
 			};
-			Polyline(hdc, edges, _countof(edges));
+			Polyline(hdc, edges2, _countof(edges2));
 		}
 
 		// TODO: handle HDS_FILTERBAR style? How?
@@ -2089,7 +2089,7 @@ namespace PluginDarkMode
 		if (overflowRect.left == overflowRect.right)
 			return S_OK;
 
-		HTHEME hTheme = headerItem.hTheme;
+		//HTHEME hTheme = headerItem.hTheme;
 		POINT cursorPos;
 		HDHITTESTINFO hti;
 		GetCursorPos(&cursorPos);
@@ -2321,7 +2321,7 @@ namespace PluginDarkMode
 
 				if (SUCCEEDED(GetThemeColor(hTheme, 0, 0, TMT_FILLCOLOR, &color)))
 				{
-					COLORREF color = PluginDarkMode::getSofterBackgroundColor();
+					color = PluginDarkMode::getSofterBackgroundColor();
 					ListView_SetTextBkColor(hWnd, PluginDarkMode::isEnabled() ? PluginDarkMode::getSofterBackgroundColor() : color);
 					ListView_SetBkColor(hWnd, PluginDarkMode::isEnabled() ? PluginDarkMode::getSofterBackgroundColor() : color);
 				}
@@ -2687,7 +2687,7 @@ namespace PluginDarkMode
 			if (wcscmp(className, WC_LINK) == 0)
 			{
 				HDC hdc = reinterpret_cast<HDC>(wParam);
-				COLORREF c = PluginDarkMode::getLinkTextColor();
+				//COLORREF c = PluginDarkMode::getLinkTextColor();
 				::SetTextColor(hdc, PluginDarkMode::getLinkTextColor());
 				::SetBkColor(hdc, PluginDarkMode::getDarkerBackgroundColor());
 				return reinterpret_cast<LRESULT>(PluginDarkMode::getDarkerBackgroundBrush());

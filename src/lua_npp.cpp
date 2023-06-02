@@ -4,9 +4,11 @@
 #include <Richedit.h>
 #include <shlwapi.h>
 #include "PluginDarkMode.h"
+
 ///////////////////
 // Plugin Variables
 ///////////////////
+
 NppData nppData;
 ExecData execData;
 CPluginOptions g_opt;
@@ -21,9 +23,16 @@ const TCHAR path_lua53[] = L"lua53.dll";
 const TCHAR path_lua54[] = L"lua54.dll";
 const TCHAR path_luajit[] = L"luajit.dll";
 static TCHAR ConsoleCaption[20]{};
-static BYTE is_floating = 8;
+static bool is_floating = true;
 static bool clr_choose_shown = false;
 static COLORREF current_color = 0;
+
+enum class ColorMode
+{
+	NORMAL,
+	OK,
+	ERR
+};
 
 FuncItem funcItems[nbFunc];
 
@@ -56,37 +65,29 @@ LRESULT SendSci(UINT iMessage, WPARAM wParam, LPARAM lParam)
 	return SendMessage(GetCurrentScintilla(), iMessage, wParam, lParam);
 }
 
-/*void SetCharFormat(COLORREF color = RGB(0, 0, 0), DWORD dwMask = CFM_COLOR, DWORD dwEffects = 0, DWORD dwOptions = SCF_ALL)
-{
-	CHARFORMAT cf{};
-	cf.cbSize = sizeof(cf);
-	cf.dwMask = dwMask;
-	cf.dwEffects = dwEffects;
-	cf.crTextColor = color;
-	SendMessage(GetConsole(), EM_SETCHARFORMAT, dwOptions, (LPARAM)&cf);
-}*/
-
 void SetConsoleColor(COLORREF color)
 {
 	current_color = color;
 }
 
+inline bool isDarkModeActive()
+{
+	return SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
+}
+
 COLORREF GetOKColor()
 {
-	const bool isDM = SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
-	return isDM ? g_opt.clrOKdm : g_opt.clrOK;
+	return isDarkModeActive() ? g_opt.clrOKdm : g_opt.clrOK;
 }
 
 COLORREF GetERRColor()
 {
-	const bool isDM = SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
-	return isDM ? g_opt.clrERRdm : g_opt.clrERR;
+	return isDarkModeActive() ? g_opt.clrERRdm : g_opt.clrERR;
 }
 
 COLORREF GetNormalColor()
 {
-	const bool isDM = SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
-	return isDM ? PluginDarkMode::getTextColor() : GetSysColor(COLOR_MENUTEXT);
+	return isDarkModeActive() ? PluginDarkMode::getTextColor() : GetSysColor(COLOR_MENUTEXT);
 }
 
 void OnLove2D()
@@ -110,7 +111,7 @@ void OnLove2D()
 		return AddStr(L"File 'main.lua' not found in current directory!\n");
 
 	// run script
-	TCHAR param_dir[MAX_PATH];
+	TCHAR param_dir[MAX_PATH]{};
 	wsprintf(param_dir, L"\"%s\"", ws_full_path);
 	ShellExecute(NULL, L"open", g_opt.LovePath, param_dir, NULL, SW_NORMAL);
 }
@@ -118,9 +119,10 @@ void OnLove2D()
 void ResetConsoleColors()
 {
 	SendMessage(GetConsole(), EM_SETBKGNDCOLOR, 0,
-		SendNpp(NPPM_ISDARKMODEENABLED, 0, 0) ?
+		isDarkModeActive() ?
 		PluginDarkMode::getSofterBackgroundColor() :
 		GetSysColor(COLOR_MENU));
+	SetConsoleColor(GetNormalColor());
 }
 
 void ResetItemCheck()
@@ -152,7 +154,7 @@ void ResetItemCheck()
 
 	SetWindowText(execData.hConsole, ConsoleCaption);
 	if (g_opt.m_bConsoleOpenOnInit)
-		if (is_floating < 4)
+		if ( !is_floating )
 		{
 			SetFocus(execData.hConsole);
 			SetFocus(GetCurrentScintilla());
@@ -214,10 +216,9 @@ void RefreshDarkMode(bool ForceUseDark = false, bool UseDark = false)
 
 	if (!ForceUseDark)
 	{
-		isDarkModeEnabled = SendNpp(NPPM_ISDARKMODEENABLED, 0, 0);
+		isDarkModeEnabled = isDarkModeActive();
 		PluginDarkMode::Colors newColors;
-		bool bSuccess = SendNpp(NPPM_GETDARKMODECOLORS, sizeof(newColors), &newColors);
-		if (bSuccess)
+		if (SendNpp(NPPM_GETDARKMODECOLORS, sizeof(newColors), &newColors))
 		{
 			PluginDarkMode::setDarkTone(PluginDarkMode::ColorTone::customizedTone);
 			PluginDarkMode::changeCustomTheme(newColors);
@@ -555,7 +556,7 @@ void OnOptions()
 
 void OnShowAboutDlg()
 {
-	TCHAR txt[] =
+	const TCHAR txt[] =
 		L" Lua plugin v2.3.5 "
 #ifdef _WIN64
 		L"(64-bit)"
@@ -589,6 +590,7 @@ HWND GetConsole()
 void OnClearConsole()
 {
 	SetWindowText(GetConsole(), NULL);
+	ResetConsoleColors();
 	bNeedClear = false;
 }
 
@@ -667,7 +669,7 @@ bool str2Clipboard(const TCHAR* str2cpy, HWND hwnd)
 void OnCopy(bool selected)
 {
 	HWND hRE = GetConsole();
-	int len = GetWindowTextLength(hRE) + 1;
+	const size_t len = GetWindowTextLength(hRE) + 1;
 	TCHAR* tmp = new TCHAR[len]{};
 	GETTEXTEX gtex{};
 	gtex.cb = static_cast<DWORD>(len * sizeof(TCHAR));// size in bytes
@@ -693,10 +695,10 @@ BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM l
 				OpenCloseConsole();
 				break;
 			case DMN_FLOAT: // floating dialog
-				is_floating = 8;
+				is_floating = true;
 				break;
 			case DMN_DOCK:  // docking dialog; HIWORD(pnmh->code) is dockstate [0..3]
-				is_floating = static_cast<BYTE>(HIWORD(pnmh->code));
+				is_floating = false; // static_cast<BYTE>(HIWORD(pnmh->code));
 				break;
 			}
 		}
