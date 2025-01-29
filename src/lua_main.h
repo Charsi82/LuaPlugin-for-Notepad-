@@ -1,8 +1,12 @@
-#pragma once
+п»ї#pragma once
 #include "PluginOptions.h"
+#include "PluginSettings.h"
 
 // addtional menu item for test
 //#define TEST_ITEM
+
+// print content Lua stack
+//#define DUMPSTACK
 
 typedef void* voidfunc();
 //typedef int *varfunc(void *L, ...); // quick and dirty using the varargs
@@ -11,18 +15,28 @@ typedef int varfuncint(void* L, ...);
 typedef void varfuncvoid(void* L, ...);
 //void print_from_lua(const char*);
 
+enum class eLuaVersion
+{
+	LUA_51,
+	LUA_52,
+	LUA_53,
+	LUA_54,
+};
+
 class CLuaManager
 {
 private:
 	HMODULE hinstLib;
-	BYTE intrp_type;
+	eLuaVersion m_lua_ver;
+	void* L; // Lua_State
+	void dump_stack();
+	void destroy();
+
 	void m_lua_call(void* L, int narg, int nret);
 	int m_lua_pcall(void* L, int narg, int nret);
 	void m_lua_getglobal(void* L, const char* name);
 	void m_lua_setglobal(void* L, const char* name);
 	int m_lua_tointeger(void* L, int idx);
-	//		void dump_stack();
-	void* L; // Lua_State
 
 	voidfunc* luaL_newstate{}; /* lua_State *luaL_newstate (void) */
 	varfuncvoid* luaL_openlibs{}; /* void (luaL_openlibs) (lua_State *L); */
@@ -51,14 +65,15 @@ private:
 	varfuncint* lua_pcallk{}; // Lua5.2+ /* int   (lua_pcallk) (lua_State *L, int nargs, int nresults, int errfunc, lua_KContext ctx, lua_KFunction k); */
 
 public:
-	CLuaManager() :hinstLib(NULL), L(NULL), intrp_type(0) {};
+	CLuaManager() :hinstLib(NULL), L(NULL), m_lua_ver(eLuaVersion::LUA_51) {};
 	~CLuaManager();
-	void reset_lib(const TCHAR*, BYTE);
+	void reset_lib(const wchar_t*, eLuaVersion);
 	void print();
 	void set_textcolor();
 	void list_files();
 	void msgbox();
-	int process(const char*, bool = false);
+	int run_file(const char* sFileFath);
+	int validate(const char* fpath, int verbose = 1);
 };
 
 enum enumNFuncItems
@@ -66,6 +81,7 @@ enum enumNFuncItems
 	CheckSyntax = 0,
 	RunScript,
 	CheckFiles,
+	AutoFormat,
 	RunLove2D,
 	Separator1,
 	LUA51,
@@ -86,75 +102,4 @@ enum enumNFuncItems
 	TestItem,
 #endif
 	nbFunc
-};
-
-static TCHAR* loc_ru[nbFunc] =
-{
-	L"Проверка синтаксиса",
-	L"Запуск скрипта",
-	L"Проверить все файлы в папке",
-	L"Запуск Love2D",
-	L"-",
-	L"Lua51",
-	L"Lua52",
-	L"Lua53",
-	L"Lua54",
-	L"LuaJIT",
-	L"-",
-	L"Показать\\cкрыть консоль",
-//	L"Очистить консоль",
-//	L"Автоочистка консоли",
-//	L"Время выполнения",
-	L"-",
-//	L"Сменить язык(RU\\ENG)",
-	L"Опции",
-	L"О плагине",
-#ifdef TEST_ITEM
-	L"тест",
-#endif
-};
-
-static TCHAR* loc_en[nbFunc] =
-{
-	L"Verify syntax",
-	L"Run script",
-	L"Check all files in folder",
-	L"Run Love2D",
-	L"-",
-	L"Lua51",
-	L"Lua52",
-	L"Lua53",
-	L"Lua54",
-	L"LuaJIT",
-	L"-",
-	L"Show\\hide Console",
-//	L"Clear Console",
-//	L"Autoclean Console",
-//	L"Print run time",
-	L"-",
-//	L"Change language(ENG\\RU)",
-	L"Options",
-	L"About",
-	
-#ifdef TEST_ITEM
-	L"test",
-#endif
-};
-
-static TCHAR* loc_items_ru[] =
-{
-	L"ENG \\ RU",
-	L"По умолчанию",
-	L"Автоочистка консоли",
-	L"Время выполнения",
-	L"Лимит времени выполнения (в секундах):",
-};
-
-static TCHAR* loc_items_eng[] =
-{
-	L"RU \\ ENG",
-	L"Default",
-	L"Autoclean Console",
-	L"Print elapsed time",
-	L"Runtime quote (in seconds):",
 };

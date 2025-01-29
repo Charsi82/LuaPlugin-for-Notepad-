@@ -506,7 +506,7 @@ namespace PluginDarkMode
 		std::uint8_t* data, * initRowData, * rowData = bm.bmBits == NULL ? bitmapData.get() : static_cast<std::uint8_t*>(bm.bmBits);
 
 		DWORD stride = bm.bmWidthBytes;
-		COLORREF colorRes = 0;
+		//COLORREF colorRes = 0;
 		ColorRGBToHLS(color, &h, &l, &s);
 
 		initRowData = rowData;
@@ -3164,7 +3164,7 @@ namespace PluginDarkMode
 
 	void setTreeViewStyle(HWND hwnd)
 	{
-		auto style = static_cast<long long>(::GetWindowLongPtr(hwnd, GWL_STYLE));
+		long style = static_cast<long>(::GetWindowLongPtr(hwnd, GWL_STYLE));
 		bool hasHotStyle = (style & TVS_TRACKSELECT) == TVS_TRACKSELECT;
 		bool change = false;
 		switch (treeViewStyle)

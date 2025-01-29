@@ -13,15 +13,13 @@
     <ClCompile Include="DarkMode\PluginDarkMode.cpp">
       <Filter>DarkMode</Filter>
     </ClCompile>
+    <ClCompile Include="Localize.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lua_main.h" />
     <ClInclude Include="PluginOptions.h" />
     <ClInclude Include="PluginSettings.h" />
     <ClInclude Include="Docking.h">
-      <Filter>plugin</Filter>
-    </ClInclude>
-    <ClInclude Include="helpers.h">
       <Filter>plugin</Filter>
     </ClInclude>
     <ClInclude Include="Notepad_plus_msgs.h">
@@ -51,6 +49,7 @@
     <ClInclude Include="DarkMode\UAHMenuBar.h">
       <Filter>DarkMode</Filter>
     </ClInclude>
+    <ClInclude Include="Localize.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="plugin">

@@ -1,5 +1,5 @@
-#include "lua_main.h"
 #include <stdio.h>
+#include "lua_main.h"
 
 #define LUA_GLOBALSINDEX	(-10002)	//Lua5.1
 #define LUAREG(L, name, func) (lua_pushcclosure(L, (func), 0), m_lua_setglobal(L, (name)))
@@ -14,19 +14,75 @@ COLORREF GetERRColor();
 COLORREF GetOKColor();
 COLORREF GetNormalColor();
 
-void print_from_lua(const char* txt)
+namespace
 {
-	size_t iSize = strlen(txt);
-	TCHAR* wtmp = new TCHAR[iSize + 1]{};
-	SysUniConv::MultiByteToUnicode(wtmp, (int)iSize, txt, (int)iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
-	AddStr(wtmp);
-	delete[] wtmp;
-}
+	void print_from_lua(const char* txt)
+	{
+		size_t iSize = strlen(txt);
+		//wchar_t* wtmp = new wchar_t [iSize + 1] {};
+		std::wstring wtmp(iSize, 0);
+		SysUniConv::MultiByteToUnicode(wtmp.data(), (int)iSize, txt, (int)iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
+		AddStr(wtmp.c_str());
+		//delete[] wtmp;
+	}
 
-int luafunc_msgbox(void* L)
-{
-	LM->msgbox();
-	return 1;
+	int luafunc_msgbox(void* L)
+	{
+		LM->msgbox();
+		return 1;
+	}
+
+	int luafunc_luahelp(void* L)
+	{
+		print_from_lua(
+			R"(lua_help() - print this help
+
+list_files('.\\\\*.*') - return table with list of file names by mask
+
+msgbox('sMessage' , 'sTitle', 'sIconType') - function show messagebox
+sMessage: text message
+sTitle : caption messagebox
+sIconType : any text from { 'ok', 'error' , 'warning', 'question' ,'info', 'yesnocancel', 'yesno' }
+return : code of pressed button
+)");
+		return 0;
+	}
+
+	int luafunc_list_files(void* L)
+	{
+		LM->list_files();
+		return 1;
+	}
+
+	int luafunc_settextcolor(void* L)
+	{
+		LM->set_textcolor();
+		return 0;
+	}
+
+	int luafunc_set_err_color(void* L)
+	{
+		SetConsoleColor(GetERRColor());
+		return 0;
+	}
+
+	int luafunc_set_ok_color(void* L)
+	{
+		SetConsoleColor(GetOKColor());
+		return 0;
+	}
+
+	int luafunc_set_normal_color(void* L)
+	{
+		SetConsoleColor(GetNormalColor());
+		return 0;
+	}
+
+	int luafunc_print(void* L)
+	{
+		LM->print();
+		return 0;
+	}
 }
 
 void CLuaManager::msgbox()
@@ -56,31 +112,6 @@ void CLuaManager::msgbox()
 	lua_pushinteger(L, res);
 }
 
-int luafunc_luahelp(void* L)
-{
-	print_from_lua(
-		"function show messagebox window\r\n\
-arg1: text massage\r\n\
-arg2 : text title\r\n\
-arg3 : text from { 'ok', 'error' , 'warning', 'info', 'yesnocancel', 'yesno' }\r\n\
-return : code button\r\n\
-msgbox('msg' [[, 'title'], icon_type] )\r\n\
-\r\n\
-function return table with file names by mask\r\n\
-list_files('.\\\\*.*')\r\n\
-\r\n\
-function print this help\r\n\
-lua_help()\r\n"
-);
-	return 0;
-}
-
-int luafunc_list_files(void* L)
-{
-	LM->list_files();
-	return 1;
-}
-
 void CLuaManager::list_files()
 {
 	WIN32_FIND_DATAA f;
@@ -98,12 +129,6 @@ void CLuaManager::list_files()
 	}
 }
 
-int luafunc_print(void* L)
-{
-	LM->print();
-	return 0;
-}
-
 void CLuaManager::print()
 {
 	int sz = lua_gettop(L);
@@ -118,7 +143,8 @@ void CLuaManager::print()
 		if (i > 1) print_from_lua(" ");
 		if (str)
 			print_from_lua(str);
-		else {
+		else
+		{
 			print_from_lua(lua_typename(L, lua_type(L, i)));
 		}
 		lua_pop(L, 1);
@@ -136,41 +162,12 @@ void CLuaManager::set_textcolor()
 	lua_settop(L, 0);
 }
 
-int luafunc_settextcolor(void* L)
+void CLuaManager::reset_lib(const wchar_t* dll_name, eLuaVersion lib_type)
 {
-	LM->set_textcolor();
-	return 0;
-}
+	m_lua_ver = lib_type;
+	destroy();
 
-int luafunc_set_err_color(void* L)
-{
-	SetConsoleColor(GetERRColor());
-	return 0;
-}
-
-int luafunc_set_ok_color(void* L)
-{
-	SetConsoleColor(GetOKColor());
-	return 0;
-}
-
-int luafunc_set_normal_color(void* L)
-{
-	SetConsoleColor(GetNormalColor());
-	return 0;
-}
-
-void CLuaManager::reset_lib(const TCHAR* dll_name, BYTE lib_type)
-{
-	intrp_type = lib_type;
-	if (hinstLib)
-	{
-		if (L) lua_close(L);
-		L = NULL;
-		FreeLibrary(hinstLib);
-	}
-
-	TCHAR lua_dll[MAX_PATH]{};
+	wchar_t lua_dll[MAX_PATH]{};
 	UINT nLen = GetModuleFileName((HMODULE)execData.hNPP, lua_dll, MAX_PATH);
 	while (nLen > 0 && lua_dll[nLen] != L'\\') lua_dll[nLen--] = 0;
 	lstrcat(lua_dll, dll_name);
@@ -198,7 +195,7 @@ void CLuaManager::reset_lib(const TCHAR* dll_name, BYTE lib_type)
 		LOAD_FUNCTION(varfuncvoid*, lua_createtable);
 		LOAD_FUNCTION(varfuncvoid*, lua_rawseti);
 
-		if (intrp_type == LUA51)
+		if (m_lua_ver == eLuaVersion::LUA_51)
 		{
 			LOAD_FUNCTION(varfuncvoid*, lua_call);
 			LOAD_FUNCTION(varfuncint*, lua_pcall);
@@ -228,7 +225,7 @@ void CLuaManager::reset_lib(const TCHAR* dll_name, BYTE lib_type)
 	}
 	else
 	{
-		TCHAR buf[MAX_PATH]{};
+		wchar_t buf[MAX_PATH]{};
 		wsprintf(buf, L"Can't load '%s'", lua_dll);
 		MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
 	}
@@ -236,68 +233,82 @@ void CLuaManager::reset_lib(const TCHAR* dll_name, BYTE lib_type)
 
 CLuaManager::~CLuaManager()
 {
-	if (L) lua_close(L);
-	if (hinstLib) FreeLibrary(hinstLib);
+	destroy();
 }
 
-void CLuaManager::m_lua_call(void* _L, int narg, int nret)
+void CLuaManager::destroy()
 {
-	if (lua_type(_L, -narg - 1) != 6 /*LUA_TFUNCTION*/) {
+	if (L)
+	{
+		lua_close(L);
+		L = nullptr;
+	}
+	if (hinstLib)
+	{
+		FreeLibrary(hinstLib);
+		hinstLib = NULL;
+	}
+}
+
+void CLuaManager::m_lua_call(void* LS, int narg, int nret)
+{
+	if (lua_type(L, -narg - 1) != 6 /*LUA_TFUNCTION*/)
+	{
 		MessageBox(NULL, L"try to call non function object", L"Error", MB_OK);
 		return;
 	}
-	if (intrp_type == LUA51)
-		lua_call(_L, narg, nret);
+	if (m_lua_ver == eLuaVersion::LUA_51)
+		lua_call(L, narg, nret);
 	else
-		lua_callk(_L, narg, nret, 0, NULL);
+		lua_callk(L, narg, nret, 0, NULL);
 }
 
-int CLuaManager::m_lua_pcall(void* _L, int narg, int nret)
+int CLuaManager::m_lua_pcall(void* LS, int narg, int nret)
 {
-	if (lua_type(_L, -narg - 1) != 6 /*LUA_TFUNCTION*/) {
+	if (lua_type(L, -narg - 1) != 6 /*LUA_TFUNCTION*/)
+	{
 		MessageBox(NULL, L"try to call non function object", L"Error", MB_OK);
 		return 0;
 	}
-	if (intrp_type == LUA51)
-		return lua_pcall(_L, narg, nret, 0);
+	if (m_lua_ver == eLuaVersion::LUA_51)
+		return lua_pcall(L, narg, nret, 0);
 	else
-		return lua_pcallk(_L, narg, nret, 0, 0, NULL);
+		return lua_pcallk(L, narg, nret, 0, 0, NULL);
 }
 
-void CLuaManager::m_lua_getglobal(void* _L, const char* name)
+void CLuaManager::m_lua_getglobal(void* LS, const char* name)
 {
-	if (intrp_type == LUA51)
+	if (m_lua_ver == eLuaVersion::LUA_51)
 		lua_getfield(L, LUA_GLOBALSINDEX, name);
 	else
 		lua_getglobal(L, name);
 }
 
-void CLuaManager::m_lua_setglobal(void* _L, const char* name)
+void CLuaManager::m_lua_setglobal(void* LS, const char* name)
 {
-	if (intrp_type == LUA51)
+	if (m_lua_ver == eLuaVersion::LUA_51)
 		lua_setfield(L, LUA_GLOBALSINDEX, name);
 	else
 		lua_setglobal(L, name);
 }
 
-int CLuaManager::m_lua_tointeger(void* _L, int idx)
+int CLuaManager::m_lua_tointeger(void* LS, int idx)
 {
-	if (intrp_type == LUA51)
+	if (m_lua_ver == eLuaVersion::LUA_51)
 		return lua_tointeger(L, idx);
 	else
 		return lua_tointegerx(L, idx, 0);
 }
 
-int CLuaManager::process(const char* fpath, bool run)
+int CLuaManager::run_file(const char* fpath)
 {
-	if (!L) {
+	if (!L)
+	{
 		AddStr(L"Error:Lua not initialized!");
 		return -1;
 	}
-	char lua_code[1024]{}; // todo with pushvfstring
-	if (run)
-		sprintf_s(lua_code, "\
-local quote = %d \
+	const char lua_code[] = "\
+return function(quote, fpath) \
 if quote>0 then \
 	local tm = os.clock() \
 	local function hook() \
@@ -308,34 +319,61 @@ if quote>0 then \
 	end \
 	debug.sethook(hook, '', 1000000) \
 end \
-local res, err = pcall(dofile,[[%s]]) \
+local res, err = pcall(dofile,fpath) \
 if quote>0 then debug.sethook() end \
-if res then return 0 end \
+if res then return -1 end \
 set_err_color() \
 print(err) \
-return tonumber(err:match(':(%s):')) or -1", g_opt.timequote, fpath, "%d+"); // 3 is time quote
-	else
-		sprintf_s(lua_code, "\
-local res, err = loadfile([[%s]]) \
-if res then \
-	set_ok_color() \
-	print([[%s - syntax OK]]) \
-	return 0 \
-end \
-set_err_color() \
-print(err) \
-return tonumber(err:match(':(%s):')) or -1", fpath, fpath, "%d+");
-	m_lua_getglobal(L, (intrp_type == LUA51) ? "loadstring" : "load");
+return (tonumber(err:match(':(%d+):')) or 1) - 1 \
+end";
+	m_lua_getglobal(L, (m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
 	lua_pushstring(L, lua_code);
 	m_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring
-	m_lua_pcall(L, 0, 1); // call created function (0 - no arguments, 1 - results)
+	m_lua_call(L, 0, 1); //
+	lua_pushinteger(L, g_opt.timequote);
+	lua_pushstring(L, fpath);
+	m_lua_pcall(L, 2, 1); // call created function (0 - no arguments, 1 - results)
 	int res = m_lua_tointeger(L, -1);
 	lua_settop(L, 0);
 	return res;
 }
 
-/*void CLuaManager::dump_stack()
+int CLuaManager::validate(const char* fpath, int verbose)
 {
+	if (!L)
+	{
+		AddStr(L"Error:Lua not initialized!");
+		return -1;
+	}
+	const char lua_code[] = "\
+return function(fpath, verbose) \
+local res, err = loadfile(fpath) \
+if res then \
+	if verbose==1 then \
+		set_ok_color() \
+		print(fpath..' - syntax OK') \
+	end \
+	return -1 \
+end \
+set_err_color() \
+print(err) \
+return (tonumber(err:match':(%d+):') or 1) - 1	\
+end";
+	m_lua_getglobal(L, (m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
+	lua_pushstring(L, lua_code);
+	m_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring
+	m_lua_call(L, 0, 1); //
+	lua_pushstring(L, fpath);
+	lua_pushinteger(L, verbose);
+	m_lua_pcall(L, 2, 1); // call created function (0 - no arguments, 1 - results)
+	int res = m_lua_tointeger(L, -1);
+	lua_settop(L, 0);
+	return res;
+}
+
+void CLuaManager::dump_stack()
+{
+#ifdef DUMPSTACK
 	if (!L) return;
 	print_from_lua("\r\n==== dump start ====");
 	int sz = lua_gettop(L);
@@ -349,11 +387,13 @@ return tonumber(err:match(':(%s):')) or -1", fpath, fpath, "%d+");
 		print_from_lua("\r\n");
 		if (str)
 			print_from_lua(str);
-		else {
+		else
+		{
 			print_from_lua(lua_typename(L, lua_type(L, i)));
 		}
 		lua_pop(L, 1);
 	}
 	lua_pop(L, 1);
 	print_from_lua("\r\n===== dump end ====\r\n");
-}*/
+#endif
+}
