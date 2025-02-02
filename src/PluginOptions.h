@@ -82,7 +82,7 @@ public:
 	bool m_bConEncoding;
 	BYTE  m_uInterpType; // Lua interpretator type
 
-	void ReadOptions();
+	void ReadOptions(int nDefaultLang);
 	void SaveOptions();
 	bool MustBeSaved() const;
 

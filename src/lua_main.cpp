@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "lua_main.h"
 
 #define LUA_GLOBALSINDEX	(-10002)	//Lua5.1
@@ -8,6 +7,7 @@
 
 extern CLuaManager* LM;
 extern CPluginOptions g_opt;
+extern ExecData execData;
 
 void SetConsoleColor(COLORREF color);
 COLORREF GetERRColor();
@@ -19,11 +19,9 @@ namespace
 	void print_from_lua(const char* txt)
 	{
 		size_t iSize = strlen(txt);
-		//wchar_t* wtmp = new wchar_t [iSize + 1] {};
 		std::wstring wtmp(iSize, 0);
 		SysUniConv::MultiByteToUnicode(wtmp.data(), (int)iSize, txt, (int)iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
 		AddStr(wtmp.c_str());
-		//delete[] wtmp;
 	}
 
 	int luafunc_msgbox(void* L)
@@ -144,9 +142,7 @@ void CLuaManager::print()
 		if (str)
 			print_from_lua(str);
 		else
-		{
 			print_from_lua(lua_typename(L, lua_type(L, i)));
-		}
 		lua_pop(L, 1);
 	}
 	lua_settop(L, 0);

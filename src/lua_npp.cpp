@@ -1,9 +1,11 @@
 ﻿#include <Richedit.h>
 #include <shlwapi.h>
 #include <format>
+#include <ctime>
+#include <thread>
+#include <functional>
 #include "resource.h"
 #include "lua_main.h"
-#include "ctime"
 #include "PluginDarkMode.h"
 #include "PluginSettings.h"
 #include "Localize.h"
@@ -12,6 +14,7 @@
 #define AppMenu(ID) AppendMenu(menu, MF_ENABLED, (ID), Localize((ID), lng))
 #define LocalizeDlgItem(ID) SetDlgItemText(hw, (ID), Localize((ID), lng))
 
+__declspec(dllimport)
 const std::vector<std::string> autoformat(std::string input, const std::vector<std::string>& v_options);
 
 ///////////////////
@@ -51,11 +54,12 @@ enum class ColorMode
 
 FuncItem funcItems[nbFunc];
 
-void InitFuncItem(int nItem, PFUNCPLUGINCMD pFunc, ShortcutKey* pShortcut)
+void InitFuncItem(int nItem, const wchar_t* szName, PFUNCPLUGINCMD pFunc, ShortcutKey* pShortcut)
 {
 	funcItems[nItem]._pFunc = pFunc;
 	funcItems[nItem]._init2Check = false; //bCheck;
 	funcItems[nItem]._pShKey = pShortcut;
+	lstrcpy(funcItems[nItem]._itemName, szName);
 }
 
 HWND GetCurrentScintilla()
@@ -95,36 +99,6 @@ COLORREF GetNormalColor()
 	return isDarkModeActive() ? PluginDarkMode::getTextColor() : GetSysColor(COLOR_MENUTEXT);
 }
 
-//void ColorizeLine(COLORREF clr, size_t from = 0, size_t to = 0)
-//{
-//	HWND hRE = GetConsole();
-//	int ndx = GetWindowTextLength(hRE);
-//	if (from == 0) from = SendMessage(hRE, EM_LINEFROMCHAR, ndx, 0);
-//	if (to == 0) { to = from + 1; }
-//	auto ofs1 = SendMessage(hRE, EM_LINEINDEX, from, 0);
-//	auto ofs2 = SendMessage(hRE, EM_LINEINDEX, to, 0);
-//	SendMessage(hRE, EM_SETSEL, ofs1, ofs2);
-//	// set color for selection
-//	CHARFORMAT cf{};
-//	cf.cbSize = sizeof(cf);
-//	cf.dwMask = CFM_COLOR;
-//	cf.dwEffects = 0;
-//	cf.crTextColor = clr;
-//	SendMessage(GetConsole(), EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&cf));
-//}
-
-//void ColorizeLine(COLORREF clr, size_t from = 0, size_t to = 0)
-//{
-//	HWND hRE = GetConsole();
-//	SendMessage(hRE, EM_SETSEL, from, to);
-//	CHARFORMAT cf{};
-//	cf.cbSize = sizeof(cf);
-//	cf.dwMask = CFM_COLOR;
-//	cf.dwEffects = 0;
-//	cf.crTextColor = clr;
-//	SendMessage(GetConsole(), EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&cf));
-//}
-
 void OnLove2D()
 {
 	// check love2d path
@@ -132,18 +106,19 @@ void OnLove2D()
 	{
 		OnClearConsole();
 		if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
-		
+
 		SetConsoleColor(GetERRColor());
 		const std::wstring tmp = std::format(L"Can't find file '{}'.", g_opt.LovePath);
 		AddStr(tmp.c_str());
 		EnableMenuItem(execData.hMenu, funcItems[RunLove2D]._cmdID, MF_BYCOMMAND | MF_DISABLED);
 		return;
 	}
-	wchar_t ws_full_path[MAX_PATH]{};
-	SendNpp(NPPM_GETCURRENTDIRECTORY, MAX_PATH, ws_full_path);
+
+	std::wstring main_path(MAX_PATH, 0);
+	SendNpp(NPPM_GETCURRENTDIRECTORY, MAX_PATH, main_path.data());
+	main_path += L"\\main.lua";
 
 	// check main.lua in current directory
-	std::wstring main_path = std::format(L"{}\\main.lua", ws_full_path);
 	if (!PathFileExists(main_path.c_str()))
 	{
 		OnClearConsole();
@@ -154,17 +129,42 @@ void OnLove2D()
 	}
 
 	// run script
-	wchar_t param_dir[MAX_PATH]{};
-	wsprintf(param_dir, L"\"%s\"", ws_full_path);
-	ShellExecute(NULL, L"open", g_opt.LovePath, param_dir, NULL, SW_NORMAL);
+	//wchar_t param_dir[MAX_PATH]{};
+	//wsprintf(param_dir, L"\"%s\"", ws_full_path);
+	//ShellExecute(NULL, L"open", g_opt.LovePath, param_dir, NULL, SW_NORMAL);
+	main_path = L"\"" + main_path + L"\"";
+	auto shell_execute = [](const wchar_t* _command, const wchar_t* _args)
+		{
+			SHELLEXECUTEINFO ShExecInfo{};
+			ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+			ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+			ShExecInfo.hwnd = NULL;
+			ShExecInfo.lpVerb = L"open";
+			ShExecInfo.lpFile = _command;
+			ShExecInfo.lpParameters = _args;
+			ShExecInfo.lpDirectory = NULL;
+			ShExecInfo.nShow = SW_NORMAL;
+			ShExecInfo.hInstApp = NULL;
+
+			ShellExecuteEx(&ShExecInfo);
+			if (!ShExecInfo.hProcess)
+			{
+				// throw exception
+				//throw GetLastErrorAsString(GetLastError());
+				return; // GetLastError();
+			}
+
+			WaitForSingleObject(ShExecInfo.hProcess, INFINITE);
+			CloseHandle(ShExecInfo.hProcess);
+		};
+	auto func = std::bind(shell_execute, g_opt.LovePath, main_path.c_str());
+	std::thread(func).detach();
 }
 
 void ResetConsoleColors()
 {
 	SendMessage(GetConsole(), EM_SETBKGNDCOLOR, 0,
-		isDarkModeActive() ?
-		PluginDarkMode::getSofterBackgroundColor() :
-		GetSysColor(COLOR_MENU));
+		isDarkModeActive() ? PluginDarkMode::getSofterBackgroundColor() : GetSysColor(COLOR_MENU));
 	SetConsoleColor(GetNormalColor());
 }
 
@@ -281,13 +281,13 @@ void ApplyLang()
 	info.fType = MFT_STRING;
 	info.fMask = MIIM_TYPE;
 
-	wchar_t buf[MAX_PATH]{};
-	wchar_t hot_key[MAX_PATH]{};
+	wchar_t buf[menuItemSize]{};
+	wchar_t hot_key[menuItemSize]{};
 	info.dwTypeData = buf;
 	for (int i = 0; i < nbFunc; i++)
 		if (funcItems[i]._pFunc)
 		{
-			GetMenuString(execData.hMenu, funcItems[i]._cmdID, buf, MAX_PATH, FALSE);
+			GetMenuString(execData.hMenu, funcItems[i]._cmdID, buf, menuItemSize, FALSE);
 			hot_key[0] = 0;
 			wchar_t* hk = wcschr(buf, L'\t');
 			if (hk) lstrcpy(hot_key, hk);
@@ -318,7 +318,14 @@ void GlobalInitialize()
 
 	SendSci(SCI_SETMOUSEDWELLTIME, 500);
 
-	g_opt.ReadOptions();
+	int isRussian = 0;
+	if (const size_t len = SendNpp(NPPM_GETNATIVELANGFILENAME, 0, NULL))
+	{
+		std::string tmp(len, 0);
+		SendNpp(NPPM_GETNATIVELANGFILENAME, len + 1, tmp.data());
+		isRussian = (tmp.find("russian") == std::string::npos) ? 1 : 0;
+	}
+	g_opt.ReadOptions(isRussian);
 	ApplyLang();
 	g_opt.m_bConsoleOpen = !g_opt.m_bConsoleOpen;
 	OpenCloseConsole();
@@ -465,7 +472,8 @@ void SetLangOptDialog(HWND hw, bool lng)
 	RedrawWindow(hw, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
 }
 
-namespace {
+namespace
+{
 	void InitOptions(HWND hw)
 	{
 		SendDlgItemMessage(hw, IDC_AFUSETABS, BM_SETCHECK, g_opt.get_autoformat_option(AFOptions::UseTabs), 0);
@@ -549,62 +557,62 @@ namespace {
 		SendSci(SCI_MARKERADD, line, marker_type);
 		SetFocus(GetCurrentScintilla());
 	}
+}
 
-	void OnAutoFormat()
+void OnAutoFormat()
+{
+	wchar_t ws_full_path[MAX_PATH]{};
+	SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path);
+	if (not_valid_document(ws_full_path)) return;
+
+	OnClearConsole();
+	if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
+
+	char full_path[MAX_PATH]{};
+	SysUniConv::UnicodeToMultiByte(full_path, MAX_PATH, ws_full_path);
+	int line = LM->validate(full_path);
+	if (line >= 0) { AddMarker(line); return; }
+	OnClearConsole();
+
+	const size_t len = SendSci(SCI_GETTEXT);
+	if (!len) return;
+	std::string buf(len, 0);
+	SendSci(SCI_GETTEXT, len + 1, reinterpret_cast<LPARAM>(buf.data()));
+
+	const std::vector<std::string> v_options = g_opt.get_autoformat_options();
+	const std::vector<std::string> v = autoformat(buf, v_options);
+	if (v.size() < 2)
 	{
-		wchar_t ws_full_path[MAX_PATH]{};
-		SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path);
-		if (not_valid_document(ws_full_path)) return;
-
-		OnClearConsole();
-		if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
-
-		char full_path[MAX_PATH]{};
-		SysUniConv::UnicodeToMultiByte(full_path, MAX_PATH, ws_full_path);
-		int line = LM->validate(full_path);
-		if (line >= 0) { AddMarker(line); return; }
-		OnClearConsole();
-
-		const size_t len = SendSci(SCI_GETTEXT);
-		if (!len) return;
-		std::string buf(len, 0);
-		SendSci(SCI_GETTEXT, len + 1, reinterpret_cast<LPARAM>(buf.data()));
-
-		const std::vector<std::string> v_options = g_opt.get_autoformat_options();
-		const std::vector<std::string> v = autoformat(buf, v_options);
-		if (v.size() < 2)
+		SetConsoleColor(GetERRColor());
+		AddStr(L"Аutoformat failed.");
+		return;
+	}
+	const std::string& new_text = v[0];
+	if (new_text.size())
+	{
+		SendSci(SCI_BEGINUNDOACTION);
+		const Sci_PositionU topline = SendSci(SCI_GETFIRSTVISIBLELINE);
+		SendSci(SCI_SETTEXT, 0, reinterpret_cast<LPARAM>(new_text.data()));
+		SendSci(SCI_ENDUNDOACTION);
+		SendNpp(NPPM_SAVECURRENTFILE, 0, 0);
+		SendSci(SCI_SETFIRSTVISIBLELINE, topline);
+		SetConsoleColor(GetOKColor());
+		AddStr(L"Аutoformat done.");
+	}
+	else
+	{
+		SetConsoleColor(GetERRColor());
+		const std::string& error_info = v[1];
+		if (error_info.size())
 		{
-			SetConsoleColor(GetERRColor());
-			AddStr(L"Аutoformat failed.");
-			return;
-		}
-		const std::string& new_text = v[0];
-		if (new_text.size())
-		{
-			SendSci(SCI_BEGINUNDOACTION);
-			const Sci_PositionU topline = SendSci(SCI_GETFIRSTVISIBLELINE);
-			SendSci(SCI_SETTEXT, 0, reinterpret_cast<LPARAM>(new_text.data()));
-			SendSci(SCI_ENDUNDOACTION);
-			SendNpp(NPPM_SAVECURRENTFILE, 0, 0);
-			SendSci(SCI_SETFIRSTVISIBLELINE, topline);
-			SetConsoleColor(GetOKColor());
-			AddStr(L"Аutoformat done.");
+			wchar_t ws_err_info[MAX_PATH]{};
+			SysUniConv::MultiByteToUnicode(ws_err_info, MAX_PATH, error_info.data());
+			AddStr(L"Аutoformat: ");
+			AddStr(ws_err_info);
 		}
 		else
 		{
-			SetConsoleColor(GetERRColor());
-			const std::string& error_info = v[1];
-			if (error_info.size())
-			{
-				wchar_t ws_err_info[MAX_PATH]{};
-				SysUniConv::MultiByteToUnicode(ws_err_info, MAX_PATH, error_info.data());
-				AddStr(L"Аutoformat: ");
-				AddStr(ws_err_info);
-			}
-			else 
-			{
-				AddStr(L"Аutoformat error.");
-			}
+			AddStr(L"Аutoformat error.");
 		}
 	}
 }
@@ -632,7 +640,7 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 
 		// DarkMode support
 		g_hOptionDlg = hw;
-		SendMessage(nppData._nppHandle, NPPM_DARKMODESUBCLASSANDTHEME, static_cast<WPARAM>(NppDarkMode::dmfInit), reinterpret_cast<LPARAM>(hw));
+		SendNpp(NPPM_DARKMODESUBCLASSANDTHEME, NppDarkMode::dmfInit, hw);
 		return TRUE;
 	}
 	case WM_LBUTTONDOWN:
@@ -965,6 +973,8 @@ INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 			InvalidateRect(hw, nullptr, TRUE); // redraw
 			break;
 		}
+		default:
+			break;
 		}
 	}
 	return FALSE;
@@ -978,7 +988,7 @@ void OnOptions()
 void OnShowAboutDlg()
 {
 	const wchar_t* txt =
-		L" Lua plugin v2.3.7 "
+		L" Lua plugin v2.3.71 "
 #ifdef _WIN64
 		L"(64-bit)"
 #else
@@ -1168,7 +1178,7 @@ void AddStr(const wchar_t* msg)
 	const size_t line_to = SendMessage(hRE, EM_LINEFROMCHAR, ndx, 0);
 	const size_t char_to = SendMessage(hRE, EM_LINEINDEX, line_to, 0);
 	const size_t line_len = SendMessage(hRE, EM_LINELENGTH, line_to, 0);
-	
+
 	// set text color
 	SendMessage(hRE, EM_SETSEL, start_from, char_to + line_len);
 	CHARFORMAT cf{};
@@ -1193,12 +1203,12 @@ void OnCheckSyntax()
 
 	char full_filepath[MAX_PATH];
 	SysUniConv::UnicodeToMultiByte(full_filepath, MAX_PATH, ws_full_path);
-	int line = LM->validate(full_filepath);
+	const int line = LM->validate(full_filepath);
 	if (line >= 0) AddMarker(line);
 	bNeedClear = true;
 }
 
-void OnRunScript()
+void OnRunScriptAsync()
 {
 	wchar_t ws_full_path[MAX_PATH]{};
 	SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path);
@@ -1230,14 +1240,19 @@ void OnRunScript()
 
 		if (g_opt.m_bShowRunTime)
 		{
-			wtmp = std::format( L"\nRuntime: {} ms", run_time);
+			wtmp = std::format(L"\nRuntime: {} ms\n", run_time);
 			AddStr(wtmp.c_str());
 		}
 		bNeedClear = false;
 	}
 }
 
-void OnCheckFiles()
+void OnRunScript()
+{
+	std::thread(OnRunScriptAsync).detach();
+}
+
+void OnCheckFilesAsync()
 {
 	wchar_t ws_full_path[MAX_PATH]{};
 	SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path); // full file path
@@ -1277,18 +1292,22 @@ void OnCheckFiles()
 		} while (FindNextFile(h, &f));
 
 		SetConsoleColor(errf_cnt ? GetERRColor() : GetOKColor());
-		const bool lng = g_opt.GetLang();
-		const wchar_t* fmtstr = Localize(STRINGID_FMT_CHECKALL, lng);
-		wsprintf(ws_full_filepath, fmtstr, (verbose ? file_cnt : errf_cnt) ? L"\r\n" : L"", errf_cnt, file_cnt);
+		const wchar_t* fmtstr = Localize(STRINGID_FMT_CHECKALL, g_opt.GetLang());
+		wsprintf(ws_full_filepath, fmtstr, (verbose ? file_cnt : errf_cnt) ? L"\n" : L"", errf_cnt, file_cnt);
 		AddStr(ws_full_filepath);
 	}
+}
+
+void OnCheckFiles()
+{
+	std::thread(OnCheckFilesAsync).detach();
 }
 
 #ifdef TEST_ITEM
 void OnTestItem()
 {
 	OnClearConsole();
-	AddStr(L"on test item clicked");
+	AddStr(L"on test item clicked\n");
 }
 #endif
 
@@ -1300,29 +1319,32 @@ DllMain(HANDLE hModule, DWORD reasonForCall, LPVOID lpReserved)
 	switch (reasonForCall)
 	{
 	case DLL_PROCESS_ATTACH:
+	{
 		execData.hNPP = (HINSTANCE)hModule;
+
 		// init menu
-		InitFuncItem(CheckSyntax, OnCheckSyntax, &sk1);
-		InitFuncItem(RunScript, OnRunScript, &sk2);
-		InitFuncItem(CheckFiles, OnCheckFiles);
-		InitFuncItem(AutoFormat, OnAutoFormat, &sk3);
-		InitFuncItem(RunLove2D, OnLove2D);
+		InitFuncItem(CheckSyntax, Localize(CheckSyntax, 1), OnCheckSyntax, &sk1);
+		InitFuncItem(RunScript, Localize(RunScript, 1), OnRunScript, &sk2);
+		InitFuncItem(CheckFiles, Localize(CheckFiles, 1), OnCheckFiles);
+		InitFuncItem(AutoFormat, Localize(AutoFormat, 1), OnAutoFormat, &sk3);
+		InitFuncItem(RunLove2D, Localize(RunLove2D, 1), OnLove2D);
 		//InitFuncItem(Separator1);
-		InitFuncItem(LUA51, OnLua51);
-		InitFuncItem(LUA52, OnLua52);
-		InitFuncItem(LUA53, OnLua53);
-		InitFuncItem(LUA54, OnLua54);
-		InitFuncItem(LUAJIT, OnLuaJIT);
+		InitFuncItem(LUA51, Localize(LUA51, 1), OnLua51);
+		InitFuncItem(LUA52, Localize(LUA52, 1), OnLua52);
+		InitFuncItem(LUA53, Localize(LUA53, 1), OnLua53);
+		InitFuncItem(LUA54, Localize(LUA54, 1), OnLua54);
+		InitFuncItem(LUAJIT, Localize(LUAJIT, 1), OnLuaJIT);
 		//InitFuncItem(Separator2);
-		InitFuncItem(ShowHideConsole, OpenCloseConsole);
-		InitFuncItem(Options, OnOptions);
-		InitFuncItem(About, OnShowAboutDlg);
+		InitFuncItem(ShowHideConsole, Localize(ShowHideConsole, 1), OpenCloseConsole);
+		InitFuncItem(Options, Localize(Options, 1), OnOptions);
+		InitFuncItem(About, Localize(About, 1), OnShowAboutDlg);
 #ifdef TEST_ITEM
-		InitFuncItem(TestItem, OnTestItem);
+		InitFuncItem(TestItem, Localize(About, 1), OnTestItem);
 #endif
+
 		m_hRichEditDll = LoadLibrary(L"Riched32.dll");
 		break;
-
+	}
 	case DLL_PROCESS_DETACH:
 		if (m_hRichEditDll)
 			FreeLibrary(m_hRichEditDll);
@@ -1344,7 +1366,7 @@ const wchar_t* getName()
 }
 
 extern "C" __declspec(dllexport)
- FuncItem* getFuncsArray(int* nbF)
+FuncItem* getFuncsArray(int* nbF)
 {
 	*nbF = nbFunc;
 	return funcItems;
@@ -1367,6 +1389,10 @@ void beNotified(SCNotification* notifyCode)
 	case NPPN_DARKMODECHANGED:
 		RefreshDarkMode();
 		ResetConsoleColors();
+		break;
+
+	case NPPN_NATIVELANGCHANGED:
+		ApplyLang();
 		break;
 
 	default:

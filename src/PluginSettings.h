@@ -2,27 +2,21 @@
 
 #include "PluginInterface.h"
 #include "Docking.h"
-//#include <map>
+
 constexpr auto sPluginName = L"Lua utils";
 
-struct ExecData {
+struct ExecData
+{
 	HINSTANCE hNPP{};
 	HWND hConsole{};
 	HMENU hMenu{};
 	wchar_t ConsoleCaption[20]{};
-	//std::map<enumNFuncItems, ShortcutKey> hkeys;
 };
 
-// Extern Variables
-extern NppData nppData;
-extern ExecData execData;
-extern FuncItem funcItems[];
-extern tTbData dockingData;
-
-void InitFuncItem(int            nItem,
-	//const wchar_t *   szName, 
-	PFUNCPLUGINCMD pFunc = nullptr,
-	ShortcutKey*   pShortcut = nullptr);
+void InitFuncItem(int	nItem,
+	const wchar_t *		szName, 
+	PFUNCPLUGINCMD		pFunc = nullptr,
+	ShortcutKey*		pShortcut = nullptr);
 
 // Plugin Functions
 LRESULT SendSci(UINT iMessage, WPARAM wParam = 0, LPARAM lParam = 0);

@@ -1,5 +1,8 @@
 #include "lua_main.h"
 
+extern NppData nppData;
+extern ExecData execData;
+
 CPluginOptions::CPluginOptions() :
 	m_bConsoleOpen(false), m_bConsoleClearOnRun(false),
 	m_bConsoleAutoclear(false), m_bShowRunTime(false), m_bConEncoding(true),
@@ -46,10 +49,10 @@ bool CPluginOptions::MustBeSaved() const
 	return (getOptFlags() != m_uFlags0) || (m_uLang != m_uLang0) || (m_uInterpType != m_uInterpType0);
 }
 
-void CPluginOptions::ReadOptions()
+void CPluginOptions::ReadOptions(int nDefaultLang)
 {
 	// get path to config
-	wchar_t  m_szDllFileName[MAX_PATH]{};
+	wchar_t m_szDllFileName[MAX_PATH]{};
 	UINT nLen = GetModuleFileName((HMODULE)execData.hNPP, szIniFilePath, MAX_PATH);
 	while (nLen-- > 0)
 		if ((szIniFilePath[nLen] == L'\\') || (szIniFilePath[nLen] == L'/'))
@@ -81,7 +84,7 @@ void CPluginOptions::ReadOptions()
 	GetPrivateProfileString(OptSectName, OptLovePath, L"C:\\Program Files\\LOVE\\love.exe", LovePath, MAX_PATH, szIniFilePath);
 	m_uInterpType0 = static_cast<BYTE>(GetPrivateProfileInt(OptSectName, OptLuaKey, LUA51, szIniFilePath));
 	m_uInterpType = m_uInterpType0;
-	m_uLang0 = static_cast<BYTE>(GetPrivateProfileInt(OptSectName, OptLangKey, 0, szIniFilePath));
+	m_uLang0 = static_cast<BYTE>(GetPrivateProfileInt(OptSectName, OptLangKey, nDefaultLang, szIniFilePath));
 	m_uLang = m_uLang0;
 	clrOK = GetPrivateProfileInt(OptSectName, OptClrOKKey, DEFCOLOROK, szIniFilePath);
 	clrOKdm = GetPrivateProfileInt(OptSectName, OptClrOKDarkKey, DEFCOLORDMOK, szIniFilePath);
@@ -106,7 +109,7 @@ void CPluginOptions::ReadOptions()
 
 void CPluginOptions::SaveOptions()
 {
-	wchar_t  szNum[10]{};
+	wchar_t szNum[10]{};
 	if (MustBeSaved())
 	{
 		BYTE uFlags = getOptFlags();
@@ -209,15 +212,17 @@ const std::vector<std::string> CPluginOptions::get_autoformat_options()
 	res.push_back("--table-sep=" + get_table_sep()); // ',' or ';'
 
 	if (get_autoformat_option(AFOptions::DumpConfig))
-		for (std::string& s : res) {
-			wchar_t  ws[MAX_PATH]{};
+		for (std::string& s : res)
+		{
+			wchar_t ws[MAX_PATH]{};
 			SysUniConv::MultiByteToUnicode(ws, MAX_PATH, s.c_str());
 			AddStr(ws); AddStr(L"\r\n");
 		}
 	return res;
 }
 
-void CPluginOptions::reset_af_options() {
+void CPluginOptions::reset_af_options()
+{
 	/*
 	//	use_tab : false
 	 set_autoformat_option(AFOptions::UseTabs, false);
@@ -294,7 +299,8 @@ void CPluginOptions::reset_af_options() {
 	set_table_sep(true);
 }
 
-std::string CPluginOptions::get_line_sep() {
+std::string CPluginOptions::get_line_sep()
+{
 	switch (m_eol_type)
 	{
 	case EOL_OS:
