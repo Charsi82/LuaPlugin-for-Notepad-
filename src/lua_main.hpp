@@ -1,6 +1,7 @@
 ﻿#pragma once
-#include "PluginOptions.h"
-#include "PluginSettings.h"
+#include "PluginOptions.hpp"
+#include "PluginSettings.hpp"
+#include <format>
 
 // addtional menu item for test
 //#define TEST_ITEM
@@ -32,11 +33,11 @@ private:
 	void dump_stack();
 	void destroy();
 
-	void m_lua_call(void* L, int narg, int nret);
-	int m_lua_pcall(void* L, int narg, int nret);
-	void m_lua_getglobal(void* L, const char* name);
-	void m_lua_setglobal(void* L, const char* name);
-	int m_lua_tointeger(void* L, int idx);
+	void do_lua_call(int narg, int nret);
+	int do_lua_pcall(int narg, int nret);
+	void do_lua_getglobal(const char* name);
+	void do_lua_setglobal(const char* name);
+	int do_lua_tointeger(int idx);
 
 	voidfunc* luaL_newstate{}; /* lua_State *luaL_newstate (void) */
 	varfuncvoid* luaL_openlibs{}; /* void (luaL_openlibs) (lua_State *L); */
@@ -72,8 +73,9 @@ public:
 	void set_textcolor();
 	void list_files();
 	void msgbox();
-	int run_file(const char* sFileFath);
-	int validate(const char* fpath, int verbose = 1);
+	std::tuple<int, std::string> run_file(const char* fpath);
+	std::tuple<int, std::string> validate(const char* fpath);
+	//int validate(const char* fpath, int verbose = 1);
 };
 
 enum enumNFuncItems
@@ -88,6 +90,7 @@ enum enumNFuncItems
 	LUA52,
 	LUA53,
 	LUA54,
+	LUAPLUTO,
 	LUAJIT,
 	Separator2,
 	ShowHideConsole,
@@ -103,3 +106,5 @@ enum enumNFuncItems
 #endif
 	nbFunc
 };
+
+void print_from_lua(const char* txt, bool enc = true);

@@ -1,7 +1,7 @@
-﻿#include "Localize.h"
-#include "resource.h"
+﻿#include "resource.h"
+#include "lua_main.hpp"
 
-const wchar_t* Localize(DWORD ItemID, bool lng)
+const wchar_t* Localize(unsigned long ItemID, bool lng)
 {
 	switch (ItemID)
 	{
@@ -41,6 +41,10 @@ const wchar_t* Localize(DWORD ItemID, bool lng)
 	case LUA54:
 	{
 		return L"Lua54";
+	} 
+	case LUAPLUTO:
+	{
+		return L"Pluto";
 	}
 	case LUAJIT:
 	{

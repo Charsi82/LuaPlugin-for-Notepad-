@@ -1,5 +1,5 @@
 ///////// encoding ///////////
-#include "PluginSettings.h"
+#include "PluginSettings.hpp"
 
 int SysUniConv::str_unsafe_len(const char* str)
 {

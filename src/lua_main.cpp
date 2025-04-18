@@ -1,7 +1,8 @@
-#include "lua_main.h"
+#include "lua_main.hpp"
+#include <sstream>
 
 #define LUA_GLOBALSINDEX	(-10002)	//Lua5.1
-#define LUAREG(L, name, func) (lua_pushcclosure(L, (func), 0), m_lua_setglobal(L, (name)))
+#define LUAREG(L, name, func) (lua_pushcclosure(L, (func), 0), do_lua_setglobal((name)))
 #define LOAD_FUNCTION(tp, fn) fn = reinterpret_cast<tp>(GetProcAddress(hinstLib, #fn)); if (!fn) AddStr(L"'"#fn"' not loaded\r\n");
 #define lua_pop(L,n) lua_settop(L, -(n)-1)
 
@@ -14,29 +15,27 @@ COLORREF GetERRColor();
 COLORREF GetOKColor();
 COLORREF GetNormalColor();
 
+void print_from_lua(const char* txt, bool enc)
+{
+	const size_t nSize = strlen(txt);
+	std::wstring wtmp(nSize, 0);
+	SysUniConv::MultiByteToUnicode(wtmp.data(), static_cast<int>(nSize), txt, static_cast<int>(nSize), enc ? (g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP) : CP_ACP);
+	AddStr(wtmp.c_str());
+}
+
 namespace
 {
-	void print_from_lua(const char* txt)
-	{
-		size_t iSize = strlen(txt);
-		std::wstring wtmp(iSize, 0);
-		SysUniConv::MultiByteToUnicode(wtmp.data(), (int)iSize, txt, (int)iSize, g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP);
-		AddStr(wtmp.c_str());
-	}
-
-	int luafunc_msgbox(void* L)
+	int luafunc_msgbox(void*)
 	{
 		LM->msgbox();
 		return 1;
 	}
 
-	int luafunc_luahelp(void* L)
+	int luafunc_luahelp(void*)
 	{
 		print_from_lua(
 			R"(lua_help() - print this help
-
 list_files('.\\\\*.*') - return table with list of file names by mask
-
 msgbox('sMessage' , 'sTitle', 'sIconType') - function show messagebox
 sMessage: text message
 sTitle : caption messagebox
@@ -46,37 +45,37 @@ return : code of pressed button
 		return 0;
 	}
 
-	int luafunc_list_files(void* L)
+	int luafunc_list_files(void*)
 	{
 		LM->list_files();
 		return 1;
 	}
 
-	int luafunc_settextcolor(void* L)
+	int luafunc_settextcolor(void*)
 	{
 		LM->set_textcolor();
 		return 0;
 	}
 
-	int luafunc_set_err_color(void* L)
+	int luafunc_set_err_color(void*)
 	{
 		SetConsoleColor(GetERRColor());
 		return 0;
 	}
 
-	int luafunc_set_ok_color(void* L)
+	int luafunc_set_ok_color(void*)
 	{
 		SetConsoleColor(GetOKColor());
 		return 0;
 	}
 
-	int luafunc_set_normal_color(void* L)
+	int luafunc_set_normal_color(void*)
 	{
 		SetConsoleColor(GetNormalColor());
 		return 0;
 	}
 
-	int luafunc_print(void* L)
+	int luafunc_print(void*)
 	{
 		LM->print();
 		return 0;
@@ -89,15 +88,16 @@ void CLuaManager::msgbox()
 	switch (lua_gettop(L))
 	{
 	case 1:
-		res = MessageBoxA(NULL, lua_tolstring(L, 1, 0), "", MB_OK);
+		res = MessageBoxA(NULL, lua_tolstring(L, 1, nullptr), "", MB_OK);
 		break;
 
 	case 2:
-		res = MessageBoxA(NULL, lua_tolstring(L, 1, 0), lua_tolstring(L, 2, 0), MB_OK);
+		res = MessageBoxA(NULL, lua_tolstring(L, 1, nullptr), lua_tolstring(L, 2, nullptr), MB_OK);
 		break;
 
-	default:
-		const char* icon = lua_tolstring(L, 3, 0);
+	case 3:
+	{
+		const char* icon = lua_tolstring(L, 3, nullptr);
 		UINT icon_type = MB_OK;
 		if (strstr(icon, "error"))		icon_type |= MB_ICONERROR;
 		if (strstr(icon, "warning"))	icon_type |= MB_ICONWARNING;
@@ -105,7 +105,11 @@ void CLuaManager::msgbox()
 		if (strstr(icon, "question"))	icon_type |= MB_ICONQUESTION;
 		if (strstr(icon, "yesnocancel"))icon_type |= MB_YESNOCANCEL;
 		else if (strstr(icon, "yesno"))	icon_type |= MB_YESNO;
-		res = MessageBoxA(NULL, lua_tolstring(L, 1, 0), lua_tolstring(L, 2, 0), icon_type);
+		res = MessageBoxA(NULL, lua_tolstring(L, 1, nullptr), lua_tolstring(L, 2, nullptr), icon_type);
+		break;
+	}
+	default:
+		break;
 	}
 	lua_pushinteger(L, res);
 }
@@ -113,9 +117,10 @@ void CLuaManager::msgbox()
 void CLuaManager::list_files()
 {
 	WIN32_FIND_DATAA f;
-	const char* mask = lua_tolstring(L, -1, 0);
-	HANDLE h = FindFirstFileA(mask, &f);
+	const char* mask = lua_tolstring(L, -1, nullptr);
 	lua_createtable(L, 0, 0);
+	if (!mask) return;
+	HANDLE h = FindFirstFileA(mask, &f);
 	if (h != INVALID_HANDLE_VALUE)
 	{
 		int i = 1;
@@ -131,31 +136,31 @@ void CLuaManager::print()
 {
 	int sz = lua_gettop(L);
 	if (!sz) return;
-	m_lua_getglobal(L, "tostring");
+	std::stringstream ss;
+	do_lua_getglobal("tostring");
 	for (int i = 1; i <= sz; i++)
 	{
 		lua_pushvalue(L, -1);
 		lua_pushvalue(L, i);
-		m_lua_pcall(L, 1, 1);
-		const char* str = lua_tolstring(L, -1, 0);
-		if (i > 1) print_from_lua(" ");
+		do_lua_pcall(1, 1);
+		const char* str = lua_tolstring(L, -1, nullptr);
+		if (i > 1) ss << " ";
 		if (str)
-			print_from_lua(str);
+			ss << str;
 		else
-			print_from_lua(lua_typename(L, lua_type(L, i)));
+			ss << lua_typename(L, lua_type(L, i));
 		lua_pop(L, 1);
 	}
-	lua_settop(L, 0);
-	print_from_lua("\r\n");
+	ss << '\n';
+	print_from_lua(ss.str().c_str());
 }
 
 void CLuaManager::set_textcolor()
 {
 	unsigned int r = 0, g = 0, b = 0;
-	const char* clrs = lua_tolstring(L, 1, 0);
-	sscanf_s(clrs, "#%02x%02x%02x", &r, &g, &b);
+	const char* clrs = lua_tolstring(L, 1, nullptr);
+	if (clrs) sscanf_s(clrs, "#%02x%02x%02x", &r, &g, &b);
 	SetConsoleColor(RGB(r, g, b));
-	lua_settop(L, 0);
 }
 
 void CLuaManager::reset_lib(const wchar_t* dll_name, eLuaVersion lib_type)
@@ -246,7 +251,7 @@ void CLuaManager::destroy()
 	}
 }
 
-void CLuaManager::m_lua_call(void* LS, int narg, int nret)
+void CLuaManager::do_lua_call(int narg, int nret)
 {
 	if (lua_type(L, -narg - 1) != 6 /*LUA_TFUNCTION*/)
 	{
@@ -259,7 +264,7 @@ void CLuaManager::m_lua_call(void* LS, int narg, int nret)
 		lua_callk(L, narg, nret, 0, NULL);
 }
 
-int CLuaManager::m_lua_pcall(void* LS, int narg, int nret)
+int CLuaManager::do_lua_pcall(int narg, int nret)
 {
 	if (lua_type(L, -narg - 1) != 6 /*LUA_TFUNCTION*/)
 	{
@@ -272,7 +277,7 @@ int CLuaManager::m_lua_pcall(void* LS, int narg, int nret)
 		return lua_pcallk(L, narg, nret, 0, 0, NULL);
 }
 
-void CLuaManager::m_lua_getglobal(void* LS, const char* name)
+void CLuaManager::do_lua_getglobal(const char* name)
 {
 	if (m_lua_ver == eLuaVersion::LUA_51)
 		lua_getfield(L, LUA_GLOBALSINDEX, name);
@@ -280,7 +285,7 @@ void CLuaManager::m_lua_getglobal(void* LS, const char* name)
 		lua_getglobal(L, name);
 }
 
-void CLuaManager::m_lua_setglobal(void* LS, const char* name)
+void CLuaManager::do_lua_setglobal(const char* name)
 {
 	if (m_lua_ver == eLuaVersion::LUA_51)
 		lua_setfield(L, LUA_GLOBALSINDEX, name);
@@ -288,7 +293,7 @@ void CLuaManager::m_lua_setglobal(void* LS, const char* name)
 		lua_setglobal(L, name);
 }
 
-int CLuaManager::m_lua_tointeger(void* LS, int idx)
+int CLuaManager::do_lua_tointeger(int idx)
 {
 	if (m_lua_ver == eLuaVersion::LUA_51)
 		return lua_tointeger(L, idx);
@@ -296,12 +301,11 @@ int CLuaManager::m_lua_tointeger(void* LS, int idx)
 		return lua_tointegerx(L, idx, 0);
 }
 
-int CLuaManager::run_file(const char* fpath)
+std::tuple<int, std::string> CLuaManager::run_file(const char* fpath)
 {
 	if (!L)
 	{
-		AddStr(L"Error:Lua not initialized!");
-		return -1;
+		return { -1, "Error:Lua not initialized!" };
 	}
 	const char lua_code[] = "\
 return function(quote, fpath) \
@@ -317,69 +321,74 @@ if quote>0 then \
 end \
 local res, err = pcall(dofile,fpath) \
 if quote>0 then debug.sethook() end \
-if res then return -1 end \
-set_err_color() \
-print(err) \
-return (tonumber(err:match(':(%d+):')) or 1) - 1 \
+if res then return -1, '' end \
+return (tonumber(err:match(':(%d+):')) or 1) - 1, err \
 end";
-	m_lua_getglobal(L, (m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
+	lua_settop(L, 0);
+	do_lua_getglobal((m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
 	lua_pushstring(L, lua_code);
-	m_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring
-	m_lua_call(L, 0, 1); //
+	do_lua_call(1, 1); // OK -> function + nil, not OK -> nil + errstring
+	do_lua_call(0, 1); //
 	lua_pushinteger(L, g_opt.timequote);
 	lua_pushstring(L, fpath);
-	m_lua_pcall(L, 2, 1); // call created function (0 - no arguments, 1 - results)
-	int res = m_lua_tointeger(L, -1);
+	do_lua_pcall(2, 2); // call created function (2 arguments, 2 results)
+	int res = do_lua_tointeger(1);
+	std::string err = lua_tolstring(L, 2, nullptr);
 	lua_settop(L, 0);
-	return res;
+	return { res, err };
 }
 
-int CLuaManager::validate(const char* fpath, int verbose)
+
+std::tuple<int, std::string> CLuaManager::validate(const char* fpath)
 {
-	if (!L)
-	{
-		AddStr(L"Error:Lua not initialized!");
-		return -1;
+	if (!L) {
+		return { 0 , "Error:Lua not initialized!" };
 	}
+
 	const char lua_code[] = "\
-return function(fpath, verbose) \
+return function(fpath) \
 local res, err = loadfile(fpath) \
 if res then \
-	if verbose==1 then \
-		set_ok_color() \
-		print(fpath..' - syntax OK') \
-	end \
-	return -1 \
+	return -1, fpath .. ' - syntax OK\\n' \
 end \
-set_err_color() \
-print(err) \
-return (tonumber(err:match':(%d+):') or 1) - 1	\
+return (tonumber(err:match(':(%d+):')) or 1) - 1, err..'\\n' \
 end";
-	m_lua_getglobal(L, (m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
-	lua_pushstring(L, lua_code);
-	m_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring
-	m_lua_call(L, 0, 1); //
-	lua_pushstring(L, fpath);
-	lua_pushinteger(L, verbose);
-	m_lua_pcall(L, 2, 1); // call created function (0 - no arguments, 1 - results)
-	int res = m_lua_tointeger(L, -1);
+
 	lua_settop(L, 0);
-	return res;
+	do_lua_getglobal((m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
+	lua_pushstring(L, lua_code);
+	//dump_stack();
+	do_lua_call(1, 1); // OK -> function + nil, not OK -> nil + errstring
+	//dump_stack();
+	if (lua_type(L, 1) != 6) /* is not a function */
+	{
+		auto err_info = std::format("internal error (not a function): {}", lua_tolstring(L, -1, nullptr));
+		lua_settop(L, 0);
+		return { 0, err_info };
+	}
+	do_lua_call(0, 1); // create lua function
+	lua_pushstring(L, fpath);
+	do_lua_pcall(1, 2); // call created function
+	int line = do_lua_tointeger(1);
+	std::string err_info = lua_tolstring(L, 2, nullptr);
+	return { line, err_info };
 }
 
 void CLuaManager::dump_stack()
 {
+	//#define DUMPSTACK
 #ifdef DUMPSTACK
 	if (!L) return;
-	print_from_lua("\r\n==== dump start ====");
 	int sz = lua_gettop(L);
-	m_lua_getglobal(L, "tostring");
+	if (!sz) return;
+	print_from_lua("\r\n==== dump start ====");
+	do_lua_getglobal(L, "tostring");
 	for (int i = 1; i <= sz; i++)
 	{
 		lua_pushvalue(L, -1);
 		lua_pushvalue(L, i);
-		m_lua_pcall(L, 1, 1);
-		const char* str = lua_tolstring(L, -1, 0);
+		do_lua_pcall(L, 1, 1);
+		const char* str = lua_tolstring(L, -1, nullptr);
 		print_from_lua("\r\n");
 		if (str)
 			print_from_lua(str);

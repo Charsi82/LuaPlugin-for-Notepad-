@@ -26,6 +26,7 @@
 #pragma comment (lib, "comctl32")          // Image List controls, tab control, etc
 #pragma comment (lib, "shlwapi")           // Load icons from Shell Stock objects
 #pragma comment (lib, "gdiplus")           // PNG file support
+#pragma warning (disable:4100)				// 	Unused params
 
 #if (USE_PCH == 1)
 #include "pch.h"

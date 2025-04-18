@@ -56,15 +56,19 @@
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="LuaNppSheet.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="LuaNppSheet.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="LuaNppSheet.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="LuaNppSheet.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
@@ -87,7 +91,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>26812</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\src\DarkMode;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -96,9 +100,7 @@
       <SubSystem>Windows</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
-    <PostBuildEvent>
-      <Command>if exist "C:\Program Files\Notepad++\plugins\lua_npp\" copy "$(OutputPath)lua_npp.dll" "C:\Program Files\Notepad++\plugins\lua_npp\lua_npp.dll"</Command>
-    </PostBuildEvent>
+    <PostBuildEvent />
     <PreBuildEvent>
       <Command>taskkill /IM "notepad++.exe" /F /FI "STATUS eq RUNNING"</Command>
     </PreBuildEvent>
@@ -125,7 +127,8 @@
       <AdditionalDependencies>$(OutDir)lua-format.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "E:\Program Files\Notepad++\plugins\lua_npp\" copy "$(TargetPath)" "E:\Program Files\Notepad++\plugins\lua_npp\lua_npp.dll"</Command>
+      <Command>if exist "$(NppDir)" copy "$(TargetPath)" "$(NppDir)lua_npp.dll"
+if exist "$(NppDir)" copy "$(OutputPath)lua_format.dll" "$(NppDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>taskkill /IM "notepad++.exe" /F /FI "STATUS eq RUNNING"</Command>
@@ -146,7 +149,7 @@
       <TreatWarningAsError>true</TreatWarningAsError>
       <SDLCheck>true</SDLCheck>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>26812</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\src\DarkMode;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -155,9 +158,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
-    <PostBuildEvent>
-      <Command>if exist "C:\Program Files\Notepad++\plugins\lua_npp\" copy "$(OutputPath)lua_npp.dll" "C:\Program Files\Notepad++\plugins\lua_npp\lua_npp.dll"</Command>
-    </PostBuildEvent>
+    <PostBuildEvent />
     <ProjectReference>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
@@ -179,7 +180,6 @@
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>..\src\DarkMode;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>26812;4100</DisableSpecificWarnings>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
     </ClCompile>
@@ -190,8 +190,8 @@
       <AdditionalDependencies>$(OutDir)lua-format.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "E:\Program Files\Notepad++\plugins\lua_npp\" copy "$(TargetPath)" "E:\Program Files\Notepad++\plugins\lua_npp\lua_npp.dll"
-if exist "E:\Program Files\Notepad++\plugins\lua_npp\" copy "$(OutputPath)lua_format.dll" "E:\Program Files\Notepad++\plugins\lua_npp\"</Command>
+      <Command>if exist "$(NppDir)" copy "$(TargetPath)" "$(NppDir)lua_npp.dll"
+if exist "$(NppDir)" copy "$(OutputPath)lua_format.dll" "$(NppDir)"</Command>
     </PostBuildEvent>
     <ProjectReference>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
@@ -216,12 +216,12 @@ if exist "E:\Program Files\Notepad++\plugins\lua_npp\" copy "$(OutputPath)lua_fo
     <ClInclude Include="DarkMode\PluginDarkMode.h" />
     <ClInclude Include="DarkMode\UAHMenuBar.h" />
     <ClInclude Include="Docking.h" />
-    <ClInclude Include="Localize.h" />
-    <ClInclude Include="lua_main.h" />
+    <ClInclude Include="Localize.hpp" />
+    <ClInclude Include="lua_main.hpp" />
     <ClInclude Include="Notepad_plus_msgs.h" />
     <ClInclude Include="PluginInterface.h" />
-    <ClInclude Include="PluginOptions.h" />
-    <ClInclude Include="PluginSettings.h" />
+    <ClInclude Include="PluginOptions.hpp" />
+    <ClInclude Include="PluginSettings.hpp" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Scintilla.h" />
   </ItemGroup>

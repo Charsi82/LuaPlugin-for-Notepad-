@@ -1,4 +1,5 @@
-#include "lua_main.h"
+#include "lua_main.hpp"
+#include <sstream>
 
 extern NppData nppData;
 extern ExecData execData;
@@ -212,12 +213,11 @@ const std::vector<std::string> CPluginOptions::get_autoformat_options()
 	res.push_back("--table-sep=" + get_table_sep()); // ',' or ';'
 
 	if (get_autoformat_option(AFOptions::DumpConfig))
-		for (std::string& s : res)
-		{
-			wchar_t ws[MAX_PATH]{};
-			SysUniConv::MultiByteToUnicode(ws, MAX_PATH, s.c_str());
-			AddStr(ws); AddStr(L"\r\n");
-		}
+	{
+		std::stringstream ss;
+		for (const std::string& s : res) ss << s << "\n";
+		print_from_lua(ss.str().c_str());
+	}
 	return res;
 }
 

@@ -16,9 +16,9 @@
     <ClCompile Include="Localize.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="lua_main.h" />
-    <ClInclude Include="PluginOptions.h" />
-    <ClInclude Include="PluginSettings.h" />
+    <ClInclude Include="lua_main.hpp" />
+    <ClInclude Include="PluginOptions.hpp" />
+    <ClInclude Include="PluginSettings.hpp" />
     <ClInclude Include="Docking.h">
       <Filter>plugin</Filter>
     </ClInclude>
@@ -49,7 +49,7 @@
     <ClInclude Include="DarkMode\UAHMenuBar.h">
       <Filter>DarkMode</Filter>
     </ClInclude>
-    <ClInclude Include="Localize.h" />
+    <ClInclude Include="Localize.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="plugin">
