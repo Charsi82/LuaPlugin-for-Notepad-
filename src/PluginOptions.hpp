@@ -82,12 +82,6 @@ public:
 	bool m_bConEncoding;
 	BYTE  m_uInterpType; // Lua interpretator type
 
-	void ReadOptions(int nDefaultLang);
-	void SaveOptions();
-	bool MustBeSaved() const;
-
-	void OnSwitchLang();
-	BYTE GetLang() const { return m_uLang; }
 	BYTE m_uFlags;
 	wchar_t  LovePath[MAX_PATH];
 	int timequote;
@@ -96,7 +90,13 @@ public:
 	COLORREF clrERRdm;
 	COLORREF clrERR;
 	UINT32 m_afopts;
-	const wchar_t* get_path() { return szIniFilePath; };
+
+	void ReadOptions(int nDefaultLang);
+	void SaveOptions();
+	bool MustBeSaved() const;
+
+	void OnSwitchLang();
+	BYTE GetLang() const { return m_uLang; }
 	const std::vector<std::string> get_autoformat_options();
 	std::string get_line_sep();
 	void set_line_sep(const std::string& s);

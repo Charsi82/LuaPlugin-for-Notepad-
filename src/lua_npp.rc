@@ -173,8 +173,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,3,8,0
- PRODUCTVERSION 2,3,8,0
+ FILEVERSION 2,3,9,0
+ PRODUCTVERSION 2,3,9,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -191,12 +191,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "NoName"
             VALUE "FileDescription", "Lua plugin for Notepad++"
-            VALUE "FileVersion", "2.3.8.0"
+            VALUE "FileVersion", "2.3.9.0"
             VALUE "InternalName", "lua_npp"
             VALUE "LegalCopyright", "Copyright (C) 2014-2025 Charsi <charsi2011@gmail.com>"
             VALUE "OriginalFilename", "lua_npp.dll"
             VALUE "ProductName", "Notepad++ Lua Plugin"
-            VALUE "ProductVersion", "2.3.8.0"
+            VALUE "ProductVersion", "2.3.9.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -204,6 +204,16 @@ BEGIN
         VALUE "Translation", 0x419, 1200
     END
 END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICON1               ICON                    "lua_icon16.ico"
 
 #endif    // Русский (Россия) resources
 /////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,8 @@ struct ExecData
 	HINSTANCE hNPP{};
 	HWND hConsole{};
 	HMENU hMenu{};
-	wchar_t ConsoleCaption[20]{};
+	wchar_t ConsoleCaption[12]{ L"Lua Console" };
+	wchar_t addInfo[8]{};
 };
 
 void InitFuncItem(int	nItem,
@@ -19,12 +20,11 @@ void InitFuncItem(int	nItem,
 	ShortcutKey*		pShortcut = nullptr);
 
 // Plugin Functions
-LRESULT SendSci(UINT iMessage, WPARAM wParam = 0, LPARAM lParam = 0);
+LRESULT SendSci(UINT iMessage, WPARAM wParam = 0, LPARAM lParam = 0) noexcept;
 HWND GetCurrentScintilla();
 void GlobalInitialize();
 void GlobalDeinitialize();
 void AddStr(const wchar_t * msg);
-HWND GetConsole();
 void OnClearConsole();
 void OpenCloseConsole();
 BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam);

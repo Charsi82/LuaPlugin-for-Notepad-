@@ -201,8 +201,7 @@ if exist "$(NppDir)" copy "$(OutputPath)lua_format.dll" "$(NppDir)"</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="DarkMode\DarkMode.cpp" />
-    <ClCompile Include="DarkMode\PluginDarkMode.cpp" />
+    <ClCompile Include="DarkModeSupport.cpp" />
     <ClCompile Include="Localize.cpp" />
     <ClCompile Include="lua_main.cpp" />
     <ClCompile Include="lua_npp.cpp" />
@@ -210,11 +209,7 @@ if exist "$(NppDir)" copy "$(OutputPath)lua_format.dll" "$(NppDir)"</Command>
     <ClCompile Include="SysUniConv.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DarkMode\DarkMode.h" />
-    <ClInclude Include="DarkMode\DPIManager.h" />
-    <ClInclude Include="DarkMode\IatHook.h" />
-    <ClInclude Include="DarkMode\PluginDarkMode.h" />
-    <ClInclude Include="DarkMode\UAHMenuBar.h" />
+    <ClInclude Include="DarkModeSupport.hpp" />
     <ClInclude Include="Docking.h" />
     <ClInclude Include="Localize.hpp" />
     <ClInclude Include="lua_main.hpp" />

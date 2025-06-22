@@ -14,7 +14,6 @@ typedef void* voidfunc();
 typedef char* varfuncchar(void* L, ...);
 typedef int varfuncint(void* L, ...);
 typedef void varfuncvoid(void* L, ...);
-//void print_from_lua(const char*);
 
 enum class eLuaVersion
 {
@@ -27,17 +26,20 @@ enum class eLuaVersion
 class CLuaManager
 {
 private:
-	HMODULE hinstLib;
-	eLuaVersion m_lua_ver;
-	void* L; // Lua_State
-	void dump_stack();
-	void destroy();
+	HMODULE hinstLib{ NULL };
+	void* L{ nullptr }; // Lua_State
+	eLuaVersion m_lua_ver{ eLuaVersion::LUA_51 };
+	void dump_stack(void* State);
+	void free_lib();
+	void reset_state();
+	void destroy_state();
 
-	void do_lua_call(int narg, int nret);
-	int do_lua_pcall(int narg, int nret);
-	void do_lua_getglobal(const char* name);
-	void do_lua_setglobal(const char* name);
-	int do_lua_tointeger(int idx);
+	bool isFunction(void* State, int idx, const char* msg);
+	void do_lua_call(void* State, int narg, int nret);
+	int do_lua_pcall(void* State, int narg, int nret);
+	void do_lua_getglobal(void* State, const char* name);
+	void do_lua_setglobal(void* State, const char* name);
+	int do_lua_tointeger(void* State, int idx);
 
 	voidfunc* luaL_newstate{}; /* lua_State *luaL_newstate (void) */
 	varfuncvoid* luaL_openlibs{}; /* void (luaL_openlibs) (lua_State *L); */
@@ -66,16 +68,14 @@ private:
 	varfuncint* lua_pcallk{}; // Lua5.2+ /* int   (lua_pcallk) (lua_State *L, int nargs, int nresults, int errfunc, lua_KContext ctx, lua_KFunction k); */
 
 public:
-	CLuaManager() :hinstLib(NULL), L(NULL), m_lua_ver(eLuaVersion::LUA_51) {};
 	~CLuaManager();
-	void reset_lib(const wchar_t*, eLuaVersion);
-	void print();
-	void set_textcolor();
-	void list_files();
-	void msgbox();
+	void reset_state(const wchar_t*, eLuaVersion);
+	void print(void* State);
+	void set_textcolor(void* State);
+	void list_files(void* State);
+	void msgbox(void* State);
 	std::tuple<int, std::string> run_file(const char* fpath);
 	std::tuple<int, std::string> validate(const char* fpath);
-	//int validate(const char* fpath, int verbose = 1);
 };
 
 enum enumNFuncItems
@@ -94,11 +94,7 @@ enum enumNFuncItems
 	LUAJIT,
 	Separator2,
 	ShowHideConsole,
-//	ClearConsole,
-//	AutoClear,
-//	PrintTime,
 	Separator3,
-//	SwitchLang,
 	Options,
 	About,
 #ifdef TEST_ITEM

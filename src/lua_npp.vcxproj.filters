@@ -7,13 +7,10 @@
     <ClCompile Include="SysUniConv.cpp">
       <Filter>plugin</Filter>
     </ClCompile>
-    <ClCompile Include="DarkMode\DarkMode.cpp">
-      <Filter>DarkMode</Filter>
-    </ClCompile>
-    <ClCompile Include="DarkMode\PluginDarkMode.cpp">
-      <Filter>DarkMode</Filter>
-    </ClCompile>
     <ClCompile Include="Localize.cpp" />
+    <ClCompile Include="DarkModeSupport.cpp">
+      <Filter>plugin</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lua_main.hpp" />
@@ -34,29 +31,14 @@
     <ClInclude Include="PluginInterface.h">
       <Filter>plugin</Filter>
     </ClInclude>
-    <ClInclude Include="DarkMode\DarkMode.h">
-      <Filter>DarkMode</Filter>
-    </ClInclude>
-    <ClInclude Include="DarkMode\DPIManager.h">
-      <Filter>DarkMode</Filter>
-    </ClInclude>
-    <ClInclude Include="DarkMode\IatHook.h">
-      <Filter>DarkMode</Filter>
-    </ClInclude>
-    <ClInclude Include="DarkMode\PluginDarkMode.h">
-      <Filter>DarkMode</Filter>
-    </ClInclude>
-    <ClInclude Include="DarkMode\UAHMenuBar.h">
-      <Filter>DarkMode</Filter>
-    </ClInclude>
     <ClInclude Include="Localize.hpp" />
+    <ClInclude Include="DarkModeSupport.hpp">
+      <Filter>plugin</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="plugin">
       <UniqueIdentifier>{692b5e8c-bcda-4ba0-83cf-9d9a8f2feb81}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="DarkMode">
-      <UniqueIdentifier>{1419d1f5-3c54-4335-9cc0-b30cafc50576}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
