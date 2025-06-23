@@ -129,10 +129,10 @@ void CLuaManager::msgbox(void* State)
 
 void CLuaManager::list_files(void* State)
 {
-	WIN32_FIND_DATAA f;
 	const char* mask = lua_tolstring(State, -1, nullptr);
 	lua_createtable(State, 0, 0);
 	if (!mask) return;
+	WIN32_FIND_DATAA f;
 	HANDLE h = FindFirstFileA(mask, &f);
 	if (h != INVALID_HANDLE_VALUE)
 	{
@@ -170,10 +170,12 @@ void CLuaManager::print(void* State)
 
 void CLuaManager::set_textcolor(void* State)
 {
-	unsigned int r = 0, g = 0, b = 0;
+	unsigned int r{}, g{}, b{};
 	const char* clrs = lua_tolstring(State, 1, nullptr);
-	if (clrs) sscanf_s(clrs, "#%02x%02x%02x", &r, &g, &b);
-	SetConsoleColor(RGB(r, g, b));
+	if (clrs && sscanf_s(clrs, "#%02x%02x%02x", &r, &g, &b) > 0)
+		SetConsoleColor(RGB(r, g, b));
+	else
+		SetConsoleColor(GetNormalColor());
 }
 
 void CLuaManager::reset_state(const wchar_t* dll_name, eLuaVersion lib_type)
@@ -186,7 +188,7 @@ void CLuaManager::reset_state(const wchar_t* dll_name, eLuaVersion lib_type)
 	while (nLen > 0 && lua_dll[nLen] != L'\\') lua_dll[nLen--] = 0;
 	lstrcat(lua_dll, dll_name);
 	hinstLib = LoadLibrary(lua_dll);
-	if(!hinstLib)
+	if (!hinstLib)
 	{
 		wchar_t buf[MAX_PATH]{};
 		wsprintf(buf, L"Can't load '%s'", lua_dll);
@@ -256,7 +258,7 @@ CLuaManager::~CLuaManager()
 
 void CLuaManager::destroy_state()
 {
- 	if (L)
+	if (L)
 	{
 		lua_close(L);
 		L = nullptr;
