@@ -74,6 +74,15 @@
 #define IDC_GBOX_COMMON                 1069
 #define IDC_CHECKVERBOSE                1070
 #define STRINGID_FMT_CHECKALL           20000
+
+#define ID_LUA51                        40011
+#define ID_LUA52                        40012
+#define ID_LUA53                        40013
+#define ID_LUA54                        40014
+#define ID_LUA55                        40015
+#define ID_LUAJIT                       40021
+#define ID_LUAPLUTO                     40022
+
 #define ID_COPY                         40000
 #define ID_COPYSELECTED                 40001
 #define ID_CLEARCONSOLE                 40002

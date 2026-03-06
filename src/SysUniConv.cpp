@@ -1,99 +1,97 @@
 ///////// encoding ///////////
 #include "PluginSettings.hpp"
 
-int SysUniConv::str_unsafe_len(const char* str)
+std::wstring SysUniConv::MultibyteToWideChar(const char* ansiString, UINT codePage)
 {
-	if (!str) return 0;
-	const char* str0 = str;
-	while (*str)  ++str;
-	return ((int)(str - str0));
-}
-
-int SysUniConv::strw_unsafe_len(const wchar_t* strw)
-{
-	if (!strw) return 0;
-	const wchar_t* strw0 = strw;
-	while (*strw)  ++strw;
-	return ((int)(strw - strw0));
-}
-
-int SysUniConv::MultiByteToUnicode(wchar_t* wStr, int wMaxLen, const char* aStr,
-	int aLen, UINT aCodePage)
-{
-	if (aStr && wStr && (wMaxLen > 0))
+	if (!strlen(ansiString))
 	{
-		if (aLen < 0)
-			aLen = str_unsafe_len(aStr);
-		if (aLen > 0)
-		{
-			return a2w(wStr, wMaxLen, aStr, aLen, aCodePage);
-		}
+		return {};
 	}
-	if (wStr && (wMaxLen > 0))
-		wStr[0] = 0;
-	return 0;
-}
 
-int SysUniConv::UnicodeToMultiByte(char* aStr, int aMaxLen, const wchar_t* wStr,
-	int wLen, UINT aCodePage)
-{
-	if (wStr && aStr && (aMaxLen > 0))
-	{
-		if (wLen < 0)
-			wLen = strw_unsafe_len(wStr);
-		if (wLen > 0)
-		{
-			return w2a(aStr, aMaxLen, wStr, wLen, aCodePage);
-		}
+	// 1. Determine the required buffer size
+	int wideCharLen = MultiByteToWideChar(
+		codePage,       // Code page for the conversion (e.g., CP_ACP for ANSI)
+		0,              // Conversion flags
+		ansiString,		// Source string
+		-1,             // -1 indicates null-terminated string, calculate length automatically
+		NULL,           // Destination buffer (NULL to get required size)
+		0               // Destination buffer size (0 to get required size)
+	);
+
+	if (wideCharLen == 0) {
+		// Handle error, e.g., GetLastError()
+		return {};
 	}
-	if (aStr && (aMaxLen > 0))
-		aStr[0] = 0;
-	return 0;
-}
 
-int SysUniConv::a2w(wchar_t* ws, int wml, const char* as, int al, UINT acp)
-{
-	int len = ::MultiByteToWideChar(acp, 0, as, al, ws, wml);
-	ws[len] = 0;
-	return len;
-}
+	// 2. Allocate the destination buffer
+	std::wstring wideCharBuffer(wideCharLen, L'\0');
 
-int SysUniConv::w2a(char* as, int aml, const wchar_t* ws, int wl, UINT acp)
-{
-	int len = ::WideCharToMultiByte(acp, 0, ws, wl, as, aml, NULL, NULL);
-	as[len] = 0;
-	return len;
-}
+	// 3. Perform the conversion
+	int result = MultiByteToWideChar(
+		codePage,
+		0,
+		ansiString,
+		-1,
+		wideCharBuffer.data(), // Pointer to the beginning of the buffer
+		wideCharLen
+	);
 
-int SysUniConv::u2a(char* as, int aml, const char* us, int ul, UINT acp)
-{
-	int      len = 0;
-	wchar_t* ws = new wchar_t[ul + 1];
-	if (ws)
-	{
-		len = ::MultiByteToWideChar(CP_UTF8, 0, us, ul, ws, ul);
-		ws[len] = 0;
-		len = ::WideCharToMultiByte(acp, 0, ws, len, as, aml, NULL, NULL);
-		delete[] ws;
+	if (result == 0) {
+		// Handle error
+		return {};
 	}
-	as[len] = 0;
-	return len;
+
+	return wideCharBuffer;
 }
 
-int SysUniConv::UTF8ToMultiByte(char* aStr, int aMaxLen, const char* uStr,
-	int uLen, UINT aCodePage)
+std::string SysUniConv::WideCharToMultibyte(const wchar_t* wideStr, UINT codePage)
 {
-	if (uStr && aStr && (aMaxLen > 0))
-	{
-		if (uLen < 0)
-			uLen = str_unsafe_len(uStr);
-		if (uLen > 0)
-		{
-			return u2a(aStr, aMaxLen, uStr, uLen, aCodePage);
-		}
+	if (wideStr == nullptr || lstrlen(wideStr) == 0) return {};	
+
+	// Determine the required buffer size for the ANSI string
+	int ansiSize = WideCharToMultiByte(
+		codePage,         // Code page to use for the conversion
+		0,                // No special flags
+		wideStr,          // Pointer to the wide-character string
+		-1,               // Input string is null-terminated
+		nullptr,          // Buffer for the converted string (get size)
+		0,                // Size of the buffer (get size)
+		nullptr,          // Default character for unmappable characters
+		nullptr           // Pointer to a boolean indicating if default char was used
+	);
+
+	if (ansiSize == 0) {
+		// Handle error, e.g., GetLastError()
+		return {};
 	}
-	if (aStr && (aMaxLen > 0))
-		aStr[0] = 0;
-	return 0;
+
+	// Allocate buffer for the ANSI string
+	std::string ansiBuffer(ansiSize, '0');
+
+	// Perform the actual conversion
+	WideCharToMultiByte(
+		codePage,
+		0,
+		wideStr,
+		-1,
+		ansiBuffer.data(), // Pointer to the buffer
+		ansiSize,          // Size of the buffer
+		nullptr,
+		nullptr
+	);
+
+	return ansiBuffer;
+}
+
+std::string SysUniConv::AnsiToUtf8(const char* ansi_string)
+{
+	const std::wstring ws = SysUniConv::MultibyteToWideChar(ansi_string, CP_ACP);
+	return SysUniConv::WideCharToMultibyte(ws.c_str(), CP_UTF8);
+}
+
+std::string SysUniConv::Utf8ToAnsi(const char* utf8_string)
+{
+	const std::wstring ws = SysUniConv::MultibyteToWideChar(utf8_string, CP_UTF8);
+	return SysUniConv::WideCharToMultibyte(ws.c_str(), CP_ACP);
 }
 

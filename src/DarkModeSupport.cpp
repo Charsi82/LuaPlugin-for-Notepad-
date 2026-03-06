@@ -69,7 +69,7 @@ namespace {
 
 COLORREF GetNormalColor() noexcept
 {
-	return isDarkModeActive() ? GetDMColor(DMColorType::text) : GetSysColor(COLOR_MENUTEXT);
+	return isDarkModeActive() ? GetDMColor(DMColorType::darkerText) : GetSysColor(COLOR_MENUTEXT);
 }
 
 COLORREF GetOKColor() noexcept

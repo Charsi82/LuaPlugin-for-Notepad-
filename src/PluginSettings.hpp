@@ -2,6 +2,7 @@
 
 #include "PluginInterface.h"
 #include "Docking.h"
+#include <string>
 
 constexpr auto sPluginName = L"Lua utils";
 
@@ -15,7 +16,7 @@ struct ExecData
 };
 
 void InitFuncItem(int	nItem,
-	const wchar_t *		szName, 
+	const wchar_t *		szName = nullptr, 
 	PFUNCPLUGINCMD		pFunc = nullptr,
 	ShortcutKey*		pShortcut = nullptr);
 
@@ -26,20 +27,13 @@ void GlobalInitialize();
 void GlobalDeinitialize();
 void AddStr(const wchar_t * msg);
 void OnClearConsole();
-void OpenCloseConsole();
+
 BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
-class SysUniConv
+namespace SysUniConv
 {
-private:
-	static int a2w(wchar_t* ws, int wml, const char* as, int al, UINT acp);
-	static int w2a(char* as, int aml, const wchar_t* ws, int wl, UINT acp);
-	static int u2a(char* as, int aml, const char* us, int ul, UINT acp);
-
-public:
-	static int str_unsafe_len( const char* str );
-	static int strw_unsafe_len( const wchar_t* strw );
-	static int UTF8ToMultiByte(char* aStr, int aMaxLen, const char* uStr, int uLen = -1, UINT aCodePage = CP_ACP);
-	static int MultiByteToUnicode(wchar_t* wStr, int wMaxLen, const char* aStr, int aLen = -1, UINT aCodePage = CP_ACP);
-	static int UnicodeToMultiByte(char* aStr, int aMaxLen, const wchar_t* wStr, int wLen = -1, UINT aCodePage = CP_ACP);
+	std::wstring MultibyteToWideChar(const char* ansiString, UINT codePage = CP_ACP);
+	std::string WideCharToMultibyte(const wchar_t* wideStr, UINT codePage = CP_ACP);
+	std::string AnsiToUtf8(const char* ansi_string);
+	std::string Utf8ToAnsi(const char* utf8_string);
 };

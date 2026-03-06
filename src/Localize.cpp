@@ -42,6 +42,10 @@ const wchar_t* Localize(unsigned long ItemID, bool lng)
 	{
 		return L"Lua54";
 	} 
+	case LUA55:
+	{
+		return L"Lua55";
+	} 
 	case LUAPLUTO:
 	{
 		return L"Pluto";

@@ -1,5 +1,5 @@
 // This file is part of Notepad++ project
-// Copyright (C)2021 Don HO <don.h@free.fr>
+// Copyright (C)2025 Don HO <don.h@free.fr>
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -49,18 +49,18 @@
 
 struct tTbData {
 	HWND hClient = nullptr;                // client Window Handle
-	const TCHAR* pszName = nullptr;        // name of plugin (shown in window)
+	const wchar_t* pszName = nullptr;        // name of plugin (shown in window)
 	int dlgID = 0;                         // a funcItem provides the function pointer to start a dialog. Please parse here these ID
 
 	// user modifications
 	UINT uMask = 0;                        // mask params: look to above defines
 	HICON hIconTab = nullptr;              // icon for tabs
-	const TCHAR* pszAddInfo = nullptr;     // for plugin to display additional informations
+	const wchar_t* pszAddInfo = nullptr;     // for plugin to display additional information
 
 	// internal data, do not use !!!
 	RECT rcFloat = {};                    // floating position
 	int iPrevCont = 0;                     // stores the privious container (toggling between float and dock)
-	const TCHAR* pszModuleName = nullptr;  // it's the plugin file name. It's used to identify the plugin
+	const wchar_t* pszModuleName = nullptr;  // it's the plugin file name. It's used to identify the plugin
 };
 
 
@@ -72,9 +72,3 @@ struct tDockMgr {
 
 #define	HIT_TEST_THICKNESS		20
 #define SPLITTER_WIDTH			4
-
-// from dockingResource.h
-#define DMN_FIRST 1050
-	#define DMN_CLOSE					(DMN_FIRST + 1)
-	#define DMN_DOCK		            (DMN_FIRST + 2)
-    #define DMN_FLOAT					(DMN_FIRST + 3)

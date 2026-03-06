@@ -1,5 +1,4 @@
 ﻿#include <Richedit.h>
-//#include <shlwapi.h>
 #include <filesystem>
 #include <chrono>
 #include <thread>
@@ -9,9 +8,13 @@
 #include "DarkModeSupport.hpp"
 #include "Localize.hpp"
 
-//#pragma comment (lib, "shlwapi") // PathFileExist
+// from dockingResource.h
+#define DMN_FIRST 1050
+#define DMN_CLOSE					(DMN_FIRST + 1)
+#define DMN_DOCK		            (DMN_FIRST + 2)
+#define DMN_FLOAT					(DMN_FIRST + 3)
 
-#define SendNpp(msg, wParam, lParam) SendMessage(nppData._nppHandle, (msg), (WPARAM)wParam, (LPARAM)lParam)																		
+#define SendNpp(msg, wParam, lParam) SendMessage(nppData._nppHandle, (msg), (WPARAM)(wParam),  (LPARAM)(lParam))
 #define AppMenu(ID) AppendMenu(menu, MF_ENABLED, (ID), Localize((ID), lng))
 #define LocalizeDlgItem(ID) SetDlgItemText(hw, (ID), Localize((ID), lng))
 
@@ -27,19 +30,17 @@ ExecData execData;
 CPluginOptions g_opt;
 bool bNeedClear = false;
 tTbData dockingData;
-HMODULE m_hRichEditDll;
-CLuaManager* LM;
+HMODULE hRichEditDll;
 
-const wchar_t* path_lua51 = L"lua51.dll";
-const wchar_t* path_lua52 = L"lua52.dll";
-const wchar_t* path_lua53 = L"lua53.dll";
-const wchar_t* path_lua54 = L"lua54.dll";
-const wchar_t* path_pluto = L"pluto.dll";
-const wchar_t* path_luajit = L"luajit.dll";
+CLuaManager& GetLM()
+{
+	static CLuaManager LM;
+	return LM;
+}
 
-static bool is_floating = true;
-static bool clr_choose_shown = false;
-static COLORREF current_color = 0;
+bool is_floating = true;
+bool clr_choose_shown = false;
+COLORREF current_color = 0;
 HWND g_hOptionDlg = NULL;
 
 ShortcutKey sk1{ false, true, false, 'S' };// alt + S
@@ -80,18 +81,65 @@ void SetConsoleColor(COLORREF color)
 	current_color = color;
 }
 
+std::wstring GetIniPath()
+{
+	wchar_t szFilePath[MAX_PATH]{};
+	SendNpp(NPPM_GETPLUGINSCONFIGDIR, MAX_PATH, szFilePath);
+	return std::format(L"{}\\" PROJECT_NAME ".ini", szFilePath);
+}
+
 namespace
 {
+	bool isRusLang()
+	{
+		if (const size_t len = SendNpp(NPPM_GETNATIVELANGFILENAME, 0, NULL))
+		{
+			std::string tmp(len, 0);
+			SendNpp(NPPM_GETNATIVELANGFILENAME, len + 1, tmp.data());
+			return tmp.starts_with("russian");
+		}
+		return false;
+	}
+
 	bool isFileExists(const wchar_t* path)
 	{
 		return std::filesystem::exists(path);
 	}
 
+	HWND GetConsole() noexcept
+	{
+		return GetDlgItem(execData.hConsole, IDC_RICHEDIT21);
+	}
+
+	void ResetConsoleColors() noexcept
+	{
+		SendMessage(GetConsole(), EM_SETBKGNDCOLOR, 0, GetBackGroundColor());
+		SetConsoleColor(GetNormalColor());
+	}
+
+	void OpenConsole()
+	{
+		g_opt.m_bConsoleOpen = true;
+		SendNpp(NPPM_SETMENUITEMCHECK, funcItems[ShowHideConsole]._cmdID, true);
+		SendNpp(NPPM_DMMSHOW, NULL, execData.hConsole);
+	}
+
+	void CloseConsole()
+	{
+		g_opt.m_bConsoleOpen = false;
+		SendNpp(NPPM_SETMENUITEMCHECK, funcItems[ShowHideConsole]._cmdID, false);
+		SendNpp(NPPM_DMMHIDE, NULL, execData.hConsole);
+	}
+
+	void OpenCloseConsole()
+	{
+		if (g_opt.m_bConsoleOpen) CloseConsole(); else OpenConsole();
+	}
 
 	void PrintError(const wchar_t* str)
 	{
 		OnClearConsole();
-		if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
+		if (!g_opt.m_bConsoleOpen) OpenConsole();
 		SetConsoleColor(GetERRColor());
 		AddStr(str);
 	}
@@ -99,8 +147,7 @@ namespace
 	void OnLove2D()
 	{
 		// check love2d path
-		//if (!PathFileExists(g_opt.LovePath))
-		if (!isFileExists(g_opt.LovePath))
+		if (!isFileExists(g_opt.LovePath.data()))
 		{
 			const std::wstring tmp = std::format(L"Can't find file '{}'.", g_opt.LovePath);
 			PrintError(tmp.c_str());
@@ -114,7 +161,6 @@ namespace
 
 		// check main.lua in current directory
 		const std::wstring main_path = scurrent_path + L"\\main.lua";
-		//if (!PathFileExists(main_path.c_str()))
 		if (!isFileExists(main_path.c_str()))
 		{
 			PrintError(L"File 'main.lua' not found in current directory!");
@@ -122,7 +168,7 @@ namespace
 		}
 
 		// run script
-		auto shell_execute = [love_path = g_opt.LovePath, main_path = scurrent_path](/*const wchar_t* _command, const wchar_t* _args*/)
+		auto shell_execute = [love_path = g_opt.LovePath.data(), main_path = scurrent_path](/*const wchar_t* _command, const wchar_t* _args*/)
 			{
 				SHELLEXECUTEINFO ShExecInfo{};
 				ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
@@ -149,17 +195,6 @@ namespace
 		std::thread(shell_execute).detach();
 	}
 
-	HWND GetConsole() noexcept
-	{
-		return GetDlgItem(execData.hConsole, IDC_RICHEDIT21);
-	}
-
-	void ResetConsoleColors() noexcept
-	{
-		SendMessage(GetConsole(), EM_SETBKGNDCOLOR, 0, GetBackGroundColor());
-		SetConsoleColor(GetNormalColor());
-	}
-
 	const wchar_t* GetAddInfo()	noexcept
 	{
 		switch (g_opt.m_uInterpType)
@@ -172,6 +207,9 @@ namespace
 
 		case LUA52:
 			return L"Lua52";
+
+		case LUA55:
+			return L"Lua55";
 
 		case LUAPLUTO:
 			return L"Pluto";
@@ -187,53 +225,38 @@ namespace
 
 	void ResetItemCheck()
 	{
-		for (int i = LUA51; i <= LUAJIT; ++i)
-			SendNpp(NPPM_SETMENUITEMCHECK, funcItems[i]._cmdID, g_opt.m_uInterpType == i);
 		wcscpy_s(execData.addInfo, GetAddInfo());
 		if (g_opt.m_bConsoleOpen)
 			SendNpp(NPPM_DMMUPDATEDISPINFO, 0, execData.hConsole);
 	}
 
-	void OnLua51()
+	void OnSwitchLuaVersion(WPARAM version)
 	{
-		g_opt.m_uInterpType = LUA51;
+		switch (version)
+		{
+		case ID_LUA51:
+			g_opt.SetLuaType(eLuaVersion::LUA51);
+			break;
+		case ID_LUA52:
+			g_opt.SetLuaType(eLuaVersion::LUA52);
+			break;
+		case ID_LUA53:
+			g_opt.SetLuaType(eLuaVersion::LUA53);
+			break;
+		case ID_LUA54:
+			g_opt.SetLuaType(eLuaVersion::LUA54);
+			break;
+		case ID_LUA55:
+			g_opt.SetLuaType(eLuaVersion::LUA55);
+			break;
+		case ID_LUAJIT:
+			g_opt.SetLuaType(eLuaVersion::LUAJIT);
+			break;
+		case ID_LUAPLUTO:
+			g_opt.SetLuaType(eLuaVersion::LUAPLUTO);
+			break;
+		}
 		ResetItemCheck();
-		LM->reset_state(path_lua51, eLuaVersion::LUA_51);
-	}
-
-	void OnLua52()
-	{
-		g_opt.m_uInterpType = LUA52;
-		ResetItemCheck();
-		LM->reset_state(path_lua52, eLuaVersion::LUA_52);
-	}
-
-	void OnLua53()
-	{
-		g_opt.m_uInterpType = LUA53;
-		ResetItemCheck();
-		LM->reset_state(path_lua53, eLuaVersion::LUA_53);
-	}
-
-	void OnLua54()
-	{
-		g_opt.m_uInterpType = LUA54;
-		ResetItemCheck();
-		LM->reset_state(path_lua54, eLuaVersion::LUA_54);
-	}
-
-	void OnLuaPluto()
-	{
-		g_opt.m_uInterpType = LUAPLUTO;
-		ResetItemCheck();
-		LM->reset_state(path_pluto, eLuaVersion::LUA_54);
-	}
-
-	void OnLuaJIT()
-	{
-		g_opt.m_uInterpType = LUAJIT;
-		ResetItemCheck();
-		LM->reset_state(path_luajit, eLuaVersion::LUA_51); // luajit based on Lua5.1
 	}
 
 	void ApplyLang()
@@ -260,7 +283,7 @@ namespace
 			}
 	}
 
-	void AddMarker(int line)
+	void ShowError(int line, const char* err)
 	{
 		SendSci(SCI_GOTOLINE, line);
 		//SendSci(SCI_SETEMPTYSELECTION);
@@ -268,13 +291,16 @@ namespace
 		SendSci(SCI_MARKERDELETE, line, marker_type); // remove mark if added
 		SendSci(SCI_MARKERADD, line, marker_type);
 		SetFocus(GetCurrentScintilla());
+
+		SetConsoleColor(GetERRColor());
+		print_from_lua(err, false);
+		bNeedClear = true;
 	}
 
-	bool isValidDocument(const wchar_t* ws_full_path)
+	bool isValidDocument(std::wstring_view ws_full_path)
 	{
-		// save file
-		SendNpp(NPPM_SAVECURRENTFILE, 0, 0);
-		if (ws_full_path[1] != ':' && ws_full_path[2] != '\\') return false;
+		ws_full_path.remove_prefix(1);
+		if (!ws_full_path._Starts_with(L":\\")) return false;
 		// get language type
 		LangType docType = LangType::L_EXTERNAL;
 		SendNpp(NPPM_GETCURRENTLANGTYPE, 0, &docType);
@@ -283,56 +309,57 @@ namespace
 
 	void OnCheckSyntax()
 	{
+		// save file
+		SendNpp(NPPM_SAVECURRENTFILE, 0, 0);
 		wchar_t ws_full_path[MAX_PATH]{};
 		SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path);
 		if (!isValidDocument(ws_full_path)) return;
 
 		OnClearConsole();
-		if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
+		if (!g_opt.m_bConsoleOpen) OpenConsole();
 
-		char full_filepath[MAX_PATH];
-		SysUniConv::UnicodeToMultiByte(full_filepath, MAX_PATH, ws_full_path);
-
-		auto [line, res] = LM->validate(full_filepath);
-		bool isErr = line > -1;
-		if (isErr) AddMarker(line);
-		SetConsoleColor((isErr) ? GetERRColor() : GetOKColor());
-		print_from_lua(res.c_str(), false);
-
-		bNeedClear = true;
+		std::string full_filepath = SysUniConv::WideCharToMultibyte(ws_full_path);
+		auto [line, res] = GetLM().validate(full_filepath.c_str());
+		if (line >= 0)
+		{
+			ShowError(line, res.c_str());
+		}
+		else
+		{
+			SetConsoleColor(GetOKColor());
+			print_from_lua(res.c_str(), false);
+			bNeedClear = true;
+		}
 	}
 
 	void OnRunScriptAsync()
 	{
+		// save file
+		SendNpp(NPPM_SAVECURRENTFILE, 0, 0);
 		wchar_t ws_full_path[MAX_PATH]{};
 		SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path);
 		if (!isValidDocument(ws_full_path)) return;
 
 		if (g_opt.m_bConsoleAutoclear || bNeedClear) OnClearConsole();
-		if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
+		if (!g_opt.m_bConsoleOpen) OpenConsole();
 
-		char full_path[MAX_PATH]{};
-		SysUniConv::UnicodeToMultiByte(full_path, MAX_PATH, ws_full_path);
-
-		auto [val_line, val_res] = LM->validate(full_path);
-		if (val_line > -1)
+		std::string full_filepath = SysUniConv::WideCharToMultibyte(ws_full_path);
+		auto [val_line, val_res] = GetLM().validate(full_filepath.c_str());
+		if (val_line >= 0)
 		{
-			AddMarker(val_line);
-			SetConsoleColor(GetERRColor());
-			print_from_lua(val_res.c_str(), false);
+			ShowError(val_line, val_res.c_str());
 			return;
 		}
 
+		ResetConsoleColors();
+
 		auto start = std::chrono::steady_clock::now();
-		auto [run_line, run_res] = LM->run_file(full_path);
+		auto [run_line, run_res] = GetLM().run_file(full_filepath.c_str());
 		auto end = std::chrono::steady_clock::now();
 
-		bNeedClear = true;
 		if (run_line >= 0) // runtime error
 		{
-			SetConsoleColor(GetERRColor());
-			AddMarker(run_line);
-			print_from_lua(run_res.c_str(), false);
+			ShowError(run_line, run_res.c_str());
 		}
 		else
 		{
@@ -340,16 +367,15 @@ namespace
 			GetLocalTime(&sTime);
 
 			SetConsoleColor(GetNormalColor());
-			std::wstring wtmp = std::format(L"\nSuccess: {:02}:{:02}:{:02}", sTime.wHour, sTime.wMinute, sTime.wSecond);
+			std::wstring wtmp = std::format(L"\nSuccess: {:02}:{:02}:{:02}\n", sTime.wHour, sTime.wMinute, sTime.wSecond);
 			AddStr(wtmp.c_str());
 
 			if (g_opt.m_bShowRunTime)
 			{
 				std::chrono::duration<double, std::milli> duration{ end - start };
-				wtmp = std::format(L"\nDuration {:.3f} ms", duration.count());
+				wtmp = std::format(L"Duration {:.3f} ms\n", duration.count());
 				AddStr(wtmp.c_str());
 			}
-			bNeedClear = false;
 		}
 	}
 
@@ -360,12 +386,15 @@ namespace
 
 	void OnCheckFilesAsync()
 	{
+		// save file
+		SendNpp(NPPM_SAVECURRENTFILE, 0, 0);
 		wchar_t ws_full_path[MAX_PATH]{};
 		SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path); // full file path
 		if (!isValidDocument(ws_full_path)) return;
 
 		OnClearConsole();
-		if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
+		if (!g_opt.m_bConsoleOpen) OpenConsole();
+		bNeedClear = true;
 
 		wchar_t f_ext[MAX_PATH]{};
 		SendNpp(NPPM_GETEXTPART, MAX_PATH, f_ext);
@@ -384,9 +413,8 @@ namespace
 			do
 			{
 				wsprintf(ws_full_filepath, L"%s\\%s", ws_full_path, f.cFileName);
-				char full_filepath[MAX_PATH]{};
-				SysUniConv::UnicodeToMultiByte(full_filepath, MAX_PATH, ws_full_filepath);
-				auto [line, res] = LM->validate(full_filepath);
+				std::string full_filepath = SysUniConv::WideCharToMultibyte(ws_full_filepath);
+				auto [line, res] = GetLM().validate(full_filepath.c_str());
 				bool isOK = line < 0;
 				++file_cnt;
 				if (!isOK)
@@ -536,7 +564,7 @@ namespace
 		SendDlgItemMessage(hw, IDC_SpaceInsideTableBraces, BM_SETCHECK, g_opt.get_autoformat_option(AFOptions::SpaceInsideTableBraces), 0);
 		SendDlgItemMessage(hw, IDC_SpaceAroundEquals, BM_SETCHECK, g_opt.get_autoformat_option(AFOptions::SpaceAroundEquals), 0);
 		SendDlgItemMessage(hw, IDC_DUMPCFG, BM_SETCHECK, g_opt.get_autoformat_option(AFOptions::DumpConfig), 0);
-		SetDlgItemTextA(hw, IDC_LINE_SEP, g_opt.get_line_sep().c_str());
+		SetDlgItemTextA(hw, IDC_LINE_SEP, g_opt.get_line_sep());
 		SetDlgItemInt(hw, IDC_COLUMN_LIMIT, g_opt.get_column_limit(), FALSE);
 		SetDlgItemInt(hw, IDC_INDENT_WIDTH, g_opt.get_indent_width(), FALSE);
 		SetDlgItemInt(hw, IDC_TAB_WIDTH, g_opt.get_tab_width(), FALSE);
@@ -570,22 +598,22 @@ namespace
 	{
 		const size_t len = SendSci(SCI_GETTEXT);
 		if (!len) return;
-
+		// save file
+		SendNpp(NPPM_SAVECURRENTFILE, 0, 0);
 		wchar_t ws_full_path[MAX_PATH]{};
 		SendNpp(NPPM_GETFULLCURRENTPATH, MAX_PATH, ws_full_path);
 		if (!isValidDocument(ws_full_path)) return;
 
 		OnClearConsole();
-		if (!g_opt.m_bConsoleOpen) OpenCloseConsole();
+		if (!g_opt.m_bConsoleOpen) OpenConsole();
 
-		char full_path[MAX_PATH]{};
-		SysUniConv::UnicodeToMultiByte(full_path, MAX_PATH, ws_full_path);
-		auto [line, res] = LM->validate(full_path);
+		//char full_path[MAX_PATH]{};
+		//SysUniConv::UnicodeToMultiByte(full_path, MAX_PATH, ws_full_path);
+		std::string full_filepath = SysUniConv::WideCharToMultibyte(ws_full_path);
+		auto [line, res] = GetLM().validate(full_filepath.c_str());
 		if (line >= 0)
 		{
-			AddMarker(line);
-			SetConsoleColor(GetERRColor());
-			print_from_lua(res.c_str(), false);
+			ShowError(line, res.c_str());
 			return;
 		}
 
@@ -593,6 +621,13 @@ namespace
 		SendSci(SCI_GETTEXT, len + 1, reinterpret_cast<LPARAM>(buf.data()));
 
 		const std::vector<std::string> v_options = g_opt.get_autoformat_options();
+		if (g_opt.get_autoformat_option(AFOptions::DumpConfig))
+		{
+			std::stringstream ss;
+			for (const std::string& s : v_options) ss << s << "\n";
+			print_from_lua(ss.str().c_str());
+		}
+
 		auto [new_text, error_info] = autoformat(buf, v_options);
 		if (new_text.size())
 		{
@@ -618,6 +653,7 @@ namespace
 				AddStr(L"Аutoformat error.");
 			}
 		}
+		bNeedClear = true;
 	}
 
 	INT_PTR CALLBACK OptionDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM /*lp*/)
@@ -630,9 +666,9 @@ namespace
 			SendDlgItemMessage(hw, IDC_CHECKRUNTIME, BM_SETCHECK, g_opt.m_bShowRunTime, 0);
 			SendDlgItemMessage(hw, IDC_CHECKCONENC, BM_SETCHECK, g_opt.m_bConEncoding, 0);
 			SetDlgItemText(hw, IDC_CHECKCONENC, g_opt.m_bConEncoding ? L"UTF8" : L"ANSI");
-			SetDlgItemText(hw, IDC_EDITLOVEPATH, g_opt.LovePath);
+			SetDlgItemText(hw, IDC_EDITLOVEPATH, g_opt.LovePath.data());
 			SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETRANGE32, 0, 15);
-			SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETPOS32, 0, g_opt.timequote);
+			SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETPOS32, 0, g_opt.m_timequote);
 
 			const bool lng = g_opt.GetLang();
 			SendDlgItemMessage(hw, IDC_CHECKLNG, BM_SETCHECK, lng, 0);
@@ -792,7 +828,7 @@ namespace
 				if (!GetOpenFileName(&ofn)) return TRUE;
 				const wchar_t* pt = L"\\love.exe";
 				if (lstrcmp(Love2D_path + lstrlen(Love2D_path) - lstrlen(pt), pt)) return TRUE;
-				lstrcpy(g_opt.LovePath, Love2D_path); // save in options
+				g_opt.LovePath = Love2D_path; // save in options
 				SetDlgItemText(hw, IDC_EDITLOVEPATH, Love2D_path);
 				EnableMenuItem(execData.hMenu, funcItems[RunLove2D]._cmdID, MF_BYCOMMAND | MF_ENABLED);
 				break;
@@ -800,7 +836,7 @@ namespace
 			case IDC_QUOTEEDIT:
 			{
 				if (IsWindowVisible(hw))
-					g_opt.timequote = GetDlgItemInt(hw, IDC_QUOTEEDIT, 0, 0);
+					g_opt.m_timequote = GetDlgItemInt(hw, IDC_QUOTEEDIT, 0, 0);
 				break;
 			}
 			case IDC_CHECKLNG:
@@ -968,10 +1004,7 @@ namespace
 			}
 			case ID_BTNRESET:
 			{
-				g_opt.clrOK = DEFCOLOROK;
-				g_opt.clrOKdm = DEFCOLORDMOK;
-				g_opt.clrERR = DEFCOLORERR;
-				g_opt.clrERRdm = DEFCOLORDMERR;
+				g_opt.reset_colors();
 				SendDlgItemMessage(hw, IDC_SPIN1, UDM_SETPOS32, 0, 3);
 				InvalidateRect(hw, nullptr, TRUE); // redraw
 				break;
@@ -991,7 +1024,7 @@ namespace
 	void OnShowAboutDlg()
 	{
 		const wchar_t* txt =
-			L" Lua plugin v2.3.9 "
+			L" Lua plugin v2.3.10 "
 #ifdef _WIN64
 			L"(64-bit)"
 #else
@@ -1011,6 +1044,17 @@ namespace
 	{
 		HMENU menu = ::CreatePopupMenu();
 		const bool lng = g_opt.GetLang();
+		auto LuaVer = static_cast<eLuaVersion>(g_opt.GetLuaType());
+		AppendMenu(menu, LuaVer == eLuaVersion::LUA51 ? MF_CHECKED : MF_ENABLED, ID_LUA51, Localize((ULONG)eLuaVersion::LUA51, lng));
+		AppendMenu(menu, LuaVer == eLuaVersion::LUA52 ? MF_CHECKED : MF_ENABLED, ID_LUA52, Localize((ULONG)eLuaVersion::LUA52, lng));
+		AppendMenu(menu, LuaVer == eLuaVersion::LUA53 ? MF_CHECKED : MF_ENABLED, ID_LUA53, Localize((ULONG)eLuaVersion::LUA53, lng));
+		AppendMenu(menu, LuaVer == eLuaVersion::LUA54 ? MF_CHECKED : MF_ENABLED, ID_LUA54, Localize((ULONG)eLuaVersion::LUA54, lng));
+		AppendMenu(menu, LuaVer == eLuaVersion::LUA55 ? MF_CHECKED : MF_ENABLED, ID_LUA55, Localize((ULONG)eLuaVersion::LUA55, lng));
+		AppendMenu(menu, LuaVer == eLuaVersion::LUAPLUTO ? MF_CHECKED : MF_ENABLED, ID_LUAPLUTO, Localize((ULONG)eLuaVersion::LUAPLUTO, lng));
+		AppendMenu(menu, LuaVer == eLuaVersion::LUAJIT ? MF_CHECKED : MF_ENABLED, ID_LUAJIT, Localize((ULONG)eLuaVersion::LUAJIT, lng));
+
+		AppendMenu(menu, MF_SEPARATOR, 0, nullptr);
+
 		AppMenu(ID_COPY);
 		AppMenu(ID_COPYSELECTED);
 		AppMenu(ID_CLEARCONSOLE);
@@ -1081,7 +1125,6 @@ namespace
 		SendMessage(hRE, EM_GETTEXTEX, reinterpret_cast<WPARAM>(&gtex), reinterpret_cast<LPARAM>(wtmp.data()));
 		str2Clipboard(wtmp.data(), execData.hConsole);
 	}
-
 }
 
 void GlobalInitialize()
@@ -1113,106 +1156,41 @@ void GlobalInitialize()
 		dockingData.hIconTab = hIcon;
 	}
 
-
 	// Register the docking dialog
 	SendNpp(NPPM_DMMREGASDCKDLG, 0, &dockingData);
 	SendNpp(NPPM_MODELESSDIALOG, execData.hConsole, MODELESSDIALOGADD);
 
-	int isRussian = 0;
-	if (const size_t len = SendNpp(NPPM_GETNATIVELANGFILENAME, 0, NULL))
-	{
-		std::string tmp(len, 0);
-		SendNpp(NPPM_GETNATIVELANGFILENAME, len + 1, tmp.data());
-		isRussian = (tmp.find("russian") == std::string::npos) ? 1 : 0;
-	}
-	g_opt.ReadOptions(isRussian);
+	g_opt.ReadOptions(!isRusLang());
 	ApplyLang();
-	g_opt.m_bConsoleOpen = !g_opt.m_bConsoleOpen;
-	OpenCloseConsole();
 
-	wchar_t plugin_dir[MAX_PATH]{};
-	UINT nLen = GetModuleFileName((HMODULE)execData.hNPP, plugin_dir, _countof(plugin_dir));
-	while (nLen > 0 && plugin_dir[nLen] != L'\\') plugin_dir[nLen--] = 0;
-	auto file_exist = [&plugin_dir](const wchar_t* dll_name)->bool
-		{
-			wchar_t lua_dll[MAX_PATH]{};
-			lstrcpy(lua_dll, plugin_dir);
-			lstrcat(lua_dll, dll_name);
-			//return PathFileExists(lua_dll);
-			return isFileExists(lua_dll);
-		};
-	auto enableMenuItem = [](int ItemID) { EnableMenuItem(execData.hMenu, funcItems[ItemID]._cmdID, MF_BYCOMMAND | MF_DISABLED); };
-
-	const bool fne51 = !file_exist(path_lua51);
-	if (fne51) enableMenuItem(LUA51);
-	const bool fne52 = !file_exist(path_lua52);
-	if (fne52) enableMenuItem(LUA52);
-	const bool fne53 = !file_exist(path_lua53);
-	if (fne53) enableMenuItem(LUA53);
-	const bool fne54 = !file_exist(path_lua54);
-	if (fne54) enableMenuItem(LUA54);
-	const bool fnePluto = !file_exist(path_pluto);
-	if (fnePluto) enableMenuItem(LUAPLUTO);
-	const bool fnejit = !file_exist(path_luajit);
-	if (fnejit) enableMenuItem(LUAJIT);
-	if (fne51 && fne52 && fne53 && fne54 && fnePluto && fnejit)
-	{
-		enableMenuItem(CheckSyntax);
-		enableMenuItem(RunScript);
-		enableMenuItem(CheckFiles);
-	}
+	ResetConsoleColors();
+	if (g_opt.m_bConsoleOpen) OpenConsole(); else CloseConsole();
 
 	// disable love2d launcher if love.exe not found
-	//if (!PathFileExists(g_opt.LovePath)) enableMenuItem(RunLove2D);
-	if (!isFileExists(g_opt.LovePath)) enableMenuItem(RunLove2D);
+	if (!isFileExists(g_opt.LovePath.data())) EnableMenuItem(execData.hMenu, funcItems[RunLove2D]._cmdID, MF_BYCOMMAND | MF_DISABLED);
 
-	LM = new CLuaManager;
-	switch (g_opt.m_uInterpType)
-	{
-	case LUA52:
-		OnLua52();
-		break;
-	case LUA53:
-		OnLua53();
-		break;
-	case LUA54:
-		OnLua54();
-		break;
-	case LUAPLUTO:
-		OnLuaPluto();
-		break;
-	case LUAJIT:
-		OnLuaJIT();
-		break;
-	case LUA51:
-	default:
-		OnLua51();
-	}
+	ResetItemCheck();
 }
 
 void GlobalDeinitialize()
 {
 	SendNpp(NPPM_MODELESSDIALOG, execData.hConsole, MODELESSDIALOGREMOVE);
 	g_opt.SaveOptions();
-	if (LM) delete LM;
-}
-
-void OpenCloseConsole()
-{
-	g_opt.m_bConsoleOpen = !g_opt.m_bConsoleOpen;
-	SendNpp(NPPM_SETMENUITEMCHECK, funcItems[ShowHideConsole]._cmdID, g_opt.m_bConsoleOpen);
-	SendNpp(g_opt.m_bConsoleOpen ? NPPM_DMMSHOW : NPPM_DMMHIDE, NULL, execData.hConsole);
-
-	// DarkMode support
-	if (g_opt.m_bConsoleOpen)
-		ResetConsoleColors();
 }
 
 void OnClearConsole()
 {
+	int numerator = 0;
+	int denominator = 0;
+	LRESULT result = Edit_GetZoom(GetConsole(), &numerator, &denominator);
+	//SendMessage(GetConsole(), EM_GETZOOM,
+	//	reinterpret_cast<WPARAM>(&numerator),
+	//	reinterpret_cast<LPARAM>(&denominator)
+	//);
 	SetWindowText(GetConsole(), NULL);
 	ResetConsoleColors();
 	bNeedClear = false;
+	if (result) Edit_SetZoom(GetConsole(), numerator, denominator);
 }
 
 BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -1227,11 +1205,13 @@ BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM l
 			switch (LOWORD(pnmh->code))
 			{
 			case DMN_CLOSE: // closing dialog
-				OpenCloseConsole();
+				CloseConsole();
 				break;
+
 			case DMN_FLOAT: // floating dialog
 				is_floating = true;
 				break;
+
 			case DMN_DOCK: // docking dialog; HIWORD(pnmh->code) is dockstate [0..3]
 				is_floating = false; // static_cast<BYTE>(HIWORD(pnmh->code));
 				break;
@@ -1243,21 +1223,42 @@ BOOL CALLBACK ConsoleProcDlg(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM l
 	{
 		switch (wParam)
 		{
+		case ID_LUA51:
+		case ID_LUA52:
+		case ID_LUA53:
+		case ID_LUA54:
+		case ID_LUA55:
+		case ID_LUAJIT:
+		case ID_LUAPLUTO:
+			OnSwitchLuaVersion(wParam);
+			break;
+
 		case ID_COPY:
 			OnCopy(false);
 			break;
+
 		case ID_COPYSELECTED:
 			OnCopy(true);
 			break;
+
 		case ID_CLEARCONSOLE:
 			OnClearConsole();
 			break;
+
 		case ID_CLOSECONSOLE:
-			OpenCloseConsole();
+			CloseConsole();
 			break;
 		}
 		break;
 	}
+	case WM_SHOWWINDOW:
+		//if (wParam) //Edit_SetCaretIndex(GetConsole(), 0); // MessageBox(NULL, L"wnd show", L"caption", MB_OK);
+	{
+		//CHARRANGE range{0, 5};
+		//SendMessage(GetConsole(), EM_EXSETSEL, 0, (LPARAM)&range);
+		SendMessage(GetConsole(), EM_SETSEL, 0, 0);
+	}
+	break;
 	case WM_CONTEXTMENU:
 	{
 		ShowPopup(hwndDlg);
@@ -1324,27 +1325,19 @@ DllMain(HANDLE hModule, DWORD reasonForCall, LPVOID /*lpReserved*/)
 		InitFuncItem(CheckFiles, Localize(CheckFiles, 1), OnCheckFiles);
 		InitFuncItem(AutoFormat, Localize(AutoFormat, 1), OnAutoFormat, &sk3);
 		InitFuncItem(RunLove2D, Localize(RunLove2D, 1), OnLove2D);
-		//InitFuncItem(Separator1);
-		InitFuncItem(LUA51, Localize(LUA51, 1), OnLua51);
-		InitFuncItem(LUA52, Localize(LUA52, 1), OnLua52);
-		InitFuncItem(LUA53, Localize(LUA53, 1), OnLua53);
-		InitFuncItem(LUA54, Localize(LUA54, 1), OnLua54);
-		InitFuncItem(LUAPLUTO, Localize(LUAPLUTO, 1), OnLuaPluto);
-		InitFuncItem(LUAJIT, Localize(LUAJIT, 1), OnLuaJIT);
-		//InitFuncItem(Separator2);
+		InitFuncItem(Separator1);
 		InitFuncItem(ShowHideConsole, Localize(ShowHideConsole, 1), OpenCloseConsole);
 		InitFuncItem(Options, Localize(Options, 1), OnOptions);
 		InitFuncItem(About, Localize(About, 1), OnShowAboutDlg);
 #ifdef TEST_ITEM
 		InitFuncItem(TestItem, Localize(About, 1), OnTestItem);
 #endif
-
-		m_hRichEditDll = LoadLibrary(L"Riched20.dll");
+		hRichEditDll = LoadLibrary(L"Riched20.dll");
 		break;
 	}
 	case DLL_PROCESS_DETACH:
-		if (m_hRichEditDll)
-			FreeLibrary(m_hRichEditDll);
+		if (hRichEditDll)
+			FreeLibrary(hRichEditDll);
 		break;
 	}
 	return TRUE;
@@ -1389,9 +1382,10 @@ void beNotified(SCNotification* notifyCode)
 
 	case NPPN_NATIVELANGCHANGED:
 		// fix reset localization to default
-	case NPPN_FILEOPENED:
-	case 2007:		// ??			
-	case 2020:		// ??				
+	//case NPPN_FILEOPENED:
+	//case 2007:		// ??			
+	//case 2020:		// ??				
+	case 2013:		// ??	close inactive tab			
 		ApplyLang();
 		//{
 		//	auto str = std::format(L"fix with event {}\n", notifyCode->nmhdr.code);

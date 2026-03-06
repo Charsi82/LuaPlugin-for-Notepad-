@@ -4,34 +4,6 @@
 #include <string>
 #include <vector>
 
-constexpr auto OptSectName = L"Options";
-constexpr auto OptFlagsKey = L"Flags";
-constexpr auto OptLangKey = L"Language";
-constexpr auto OptLuaKey = L"Lua";
-constexpr auto OptLovePath = L"LovePath";
-constexpr auto OptClrOKKey = L"colorOK";
-constexpr auto OptClrOKDarkKey = L"colorOK_dark";
-constexpr auto OptClrERRKey = L"colorERR";
-constexpr auto OptClrERRDarkKey = L"colorERR_dark";
-constexpr auto OptTimeQuoteKey = L"TimeQuote";
-constexpr auto OptAFOptions = L"AutoFormatOptions";
-constexpr auto OptAFColumnLimit = L"OptAFColumnLimit";
-constexpr auto OptAFIndentWidth = L"OptAFIndentWidth";
-constexpr auto OptAFEolType = L"OptAFEolType";
-constexpr auto OptTabWidth = L"OptTabWidth";
-constexpr auto OptContIndentWidth = L"OptContIndentWidth";
-constexpr auto OptSpacesBeforeCall = L"OptSpacesBeforeCall";
-constexpr auto OptColumnTableLimit = L"OptColumnTableLimit";
-constexpr auto OptColumnTableLimitKV = L"OptColumnTableLimitKV";
-constexpr auto OptLineBreaks = L"OptLineBreaks";
-constexpr auto OptTabSep = L"OptTabSep";
-constexpr auto OptERRVERB = L"ErrVerb";
-
-const COLORREF DEFCOLOROK = 0x008000;
-const COLORREF DEFCOLORDMOK = 0x00FA0A;
-const COLORREF DEFCOLORERR = 0x00080;
-const COLORREF DEFCOLORDMERR = 0x00FFFF;
-
 enum AFOptions
 {
 	UseTabs,
@@ -83,63 +55,61 @@ public:
 	BYTE  m_uInterpType; // Lua interpretator type
 
 	BYTE m_uFlags;
-	wchar_t  LovePath[MAX_PATH];
-	int timequote;
+	std::wstring LovePath;
+	UINT32 m_timequote;
 	COLORREF clrOKdm;
 	COLORREF clrOK;
 	COLORREF clrERRdm;
 	COLORREF clrERR;
 	UINT32 m_afopts;
-
-	void ReadOptions(int nDefaultLang);
+	void ReadOptions(BYTE defLang);
 	void SaveOptions();
-	bool MustBeSaved() const;
 
+	BYTE GetLuaType() const { return m_uInterpType; }
+	void SetLuaType(BYTE value) { m_uInterpType = value; }
 	void OnSwitchLang();
 	BYTE GetLang() const { return m_uLang; }
 	const std::vector<std::string> get_autoformat_options();
-	std::string get_line_sep();
+	const char* get_line_sep();
 	void set_line_sep(const std::string& s);
-	UINT get_column_limit();
+	UINT get_column_limit() const;
 	void set_column_limit(UINT);
 	bool get_autoformat_option(AFOptions OptType) const;
 	void set_autoformat_option(AFOptions OptType, bool state);
-	int get_indent_width();
+	int get_indent_width() const;
 	void set_indent_width(int);
-	int get_tab_width();
+	int get_tab_width() const;
 	void set_tab_width(int);
-	int get_continuation_indent_width();
+	int get_continuation_indent_width() const;
 	void set_continuation_indent_width(int);
-	int get_spaces_before_call();
+	int get_spaces_before_call() const;
 	void set_spaces_before_call(int);
-	std::string get_table_sep();
+	const char* get_table_sep() const;
 	bool tabsep_is_comma() const;
 	void set_table_sep(bool is_comma);
-	int get_column_table_limit();
+	int get_column_table_limit() const;
 	void set_column_table_limit(int);
-	int get_line_breaks();
+	int get_line_breaks() const;
 	void set_line_breaks(int);
-	int get_column_table_limit_kv();
+	int get_column_table_limit_kv() const;
 	void set_column_table_limit_kv(int);
-	void reset_af_options();
 	int get_err_verbose() const;
 	void set_err_verbose(int);
+	void reset_af_options();
+	void reset_colors();
 
 private:
 	BYTE getOptFlags() const;
-	wchar_t  szIniFilePath[MAX_PATH];
 
-	enum eOptConsts {
+	enum eOptConsts
+	{
 		OPTF_CONOPENONINIT = 0x01,
 		OPTF_CONCLEARONRUN = 0x02,
 		OPTF_CONAUTOCLEAR = 0x04,
 		OPTF_PRINTRUNTIME = 0x08,
 		OPTF_CONENCODING = 0x10
 	};
-	BYTE  m_uFlags0;
 	BYTE  m_uLang;
-	BYTE  m_uLang0;
-	BYTE  m_uInterpType0;
 	UINT m_column_limit;
 	EOLTYPES m_eol_type;
 	int m_indent_width;

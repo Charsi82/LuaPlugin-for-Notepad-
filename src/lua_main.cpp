@@ -1,36 +1,29 @@
-#include <sstream>
 #include "lua_main.hpp"
 #include "DarkModeSupport.hpp"
+#include <sstream>
+#include <filesystem>
 
 #define LUA_GLOBALSINDEX	(-10002)	//Lua5.1
 #define LUAREG(LState, name, func) (lua_pushcclosure(L, (func), 0), do_lua_setglobal(LState, (name)))
-#define LOAD_FUNCTION(tp, fn) fn = reinterpret_cast<tp>(GetProcAddress(hinstLib, #fn)); if (!fn) AddStr(L"'"#fn"' not loaded\r\n");
+#define LOAD_FUNCTION(tp, fn) fn = reinterpret_cast<tp>(GetProcAddress(hinstLib, #fn)); if (!fn) { AddStr(L"'"#fn"' not loaded\r\n"); return; }
 #define lua_pop(L, n) lua_settop(L, -(n)-1)
 
-extern CLuaManager* LM;
+//extern CLuaManager* LM;
 extern CPluginOptions g_opt;
 extern ExecData execData;
 
 void SetConsoleColor(COLORREF color);
 
-std::wstring StringConvert(const char* txt, bool enc)
-{
-	const size_t nSize = strlen(txt);
-	std::wstring wtmp(nSize, 0);
-	SysUniConv::MultiByteToUnicode(wtmp.data(), static_cast<int>(nSize), txt, static_cast<int>(nSize), enc ? (g_opt.m_bConEncoding ? CP_UTF8 : CP_ACP) : CP_ACP);
-	return wtmp;
-}
-
-void print_from_lua(const char* txt, bool enc)
-{
-	AddStr(StringConvert(txt, enc).c_str());
-}
-
 namespace
 {
+	std::wstring StringConvert(const char* txt, bool enc)
+	{
+		return SysUniConv::MultibyteToWideChar(txt, (enc && g_opt.m_bConEncoding) ? CP_UTF8 : CP_ACP);
+	}
+
 	int luafunc_msgbox(void* State)
 	{
-		LM->msgbox(State);
+		GetLM().msgbox(State);
 		return 1;
 	}
 
@@ -50,13 +43,13 @@ return : code of pressed button
 
 	int luafunc_list_files(void* State)
 	{
-		LM->list_files(State);
+		GetLM().list_files(State);
 		return 1;
 	}
 
 	int luafunc_settextcolor(void* State)
 	{
-		LM->set_textcolor(State);
+		GetLM().set_textcolor(State);
 		return 0;
 	}
 
@@ -80,9 +73,24 @@ return : code of pressed button
 
 	int luafunc_print(void* State)
 	{
-		LM->print(State);
+		GetLM().print(State);
 		return 0;
 	}
+
+	int luafunc_string_to_utf8(void* State)
+	{
+		return GetLM().string_to_utf8(State);
+	}
+
+	int luafunc_string_from_utf8(void* State)
+	{
+		return GetLM().string_from_utf8(State);
+	}
+}
+
+void print_from_lua(const char* txt, bool enc)
+{
+	AddStr(StringConvert(txt, enc).c_str());
 }
 
 void CLuaManager::msgbox(void* State)
@@ -145,6 +153,28 @@ void CLuaManager::list_files(void* State)
 	}
 }
 
+int CLuaManager::string_to_utf8(void* State)
+{
+	if (const char* text = lua_tolstring(State, 1, nullptr))
+	{
+		std::string utf8 = SysUniConv::AnsiToUtf8(text);
+		lua_pushstring(State, utf8.c_str());
+		return 1;
+	}
+	return 0;
+}
+
+int CLuaManager::string_from_utf8(void* State)
+{
+	if (const char* text = lua_tolstring(State, 1, nullptr))
+	{
+		std::string ansi = SysUniConv::Utf8ToAnsi(text);
+		lua_pushstring(State, ansi.c_str());
+		return 1;
+	}
+	return 0;
+}
+
 void CLuaManager::print(void* State)
 {
 	int sz = lua_gettop(State);
@@ -178,66 +208,99 @@ void CLuaManager::set_textcolor(void* State)
 		SetConsoleColor(GetNormalColor());
 }
 
-void CLuaManager::reset_state(const wchar_t* dll_name, eLuaVersion lib_type)
+const wchar_t* CLuaManager::GeLuaDllName() const noexcept
 {
-	m_lua_ver = lib_type;
-	destroy_state();
-	free_lib();
-	wchar_t lua_dll[MAX_PATH]{};
-	UINT nLen = GetModuleFileName((HMODULE)execData.hNPP, lua_dll, MAX_PATH);
-	while (nLen > 0 && lua_dll[nLen] != L'\\') lua_dll[nLen--] = 0;
-	lstrcat(lua_dll, dll_name);
-	hinstLib = LoadLibrary(lua_dll);
+	switch (g_opt.GetLuaType())
+	{
+	case eLuaVersion::LUA54:
+		return L"Lua54";
+
+	case eLuaVersion::LUA53:
+		return L"Lua53";
+
+	case eLuaVersion::LUA52:
+		return L"Lua52";
+
+	case eLuaVersion::LUA55:
+		return L"Lua55";
+
+	case eLuaVersion::LUAPLUTO:
+		return L"Pluto";
+
+	case eLuaVersion::LUAJIT:
+		return L"LuaJIT";
+
+	case eLuaVersion::LUA51:
+	default:
+		return L"Lua51";
+	}
+}
+
+//void CLuaManager::SetVersion(eLuaVersion ver)
+//{
+//	//m_lua_ver = ver;
+//	g_opt.SetLuaType((BYTE)ver);
+//}
+
+void CLuaManager::init_state()
+{
+	std::wstring dll_path = std::format(L".\\plugins\\" PROJECT_NAME "\\{}.dll", GeLuaDllName());
+	hinstLib = LoadLibrary(dll_path.c_str());
 	if (!hinstLib)
 	{
 		wchar_t buf[MAX_PATH]{};
-		wsprintf(buf, L"Can't load '%s'", lua_dll);
+		wsprintf(buf, L"Can't load '%s'", dll_path.c_str());
 		MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
 	}
-	reset_state();
 }
 
 void CLuaManager::reset_state()
 {
 	destroy_state();
+	init_state();
 	if (!hinstLib) return;
 
-	OnClearConsole();
+	LOAD_FUNCTION(voidfunc_t, luaL_newstate);
+	LOAD_FUNCTION(varfuncvoid_t, lua_close);
+	LOAD_FUNCTION(varfuncchar_t, lua_pushstring);
+	LOAD_FUNCTION(varfuncvoid_t, lua_pushvalue);
+	LOAD_FUNCTION(varfuncvoid_t, lua_pushinteger);
+	LOAD_FUNCTION(varfuncvoid_t, lua_pushcclosure);
+	LOAD_FUNCTION(varfuncchar_t, lua_tolstring);
+	LOAD_FUNCTION(varfuncvoid_t, lua_setfield);
+	LOAD_FUNCTION(varfuncvoid_t, lua_getfield);
+	LOAD_FUNCTION(varfuncvoid_t, lua_settop);
+	LOAD_FUNCTION(varfuncint_t, lua_gettop);
+	LOAD_FUNCTION(varfuncint_t, lua_type);
+	LOAD_FUNCTION(varfuncchar_t, lua_typename);
+	LOAD_FUNCTION(varfuncvoid_t, lua_createtable);
+	LOAD_FUNCTION(varfuncvoid_t, lua_rawseti);
 
-	LOAD_FUNCTION(voidfunc*, luaL_newstate);
-	LOAD_FUNCTION(varfuncvoid*, luaL_openlibs);
-	LOAD_FUNCTION(varfuncvoid*, lua_close);
-	LOAD_FUNCTION(varfuncchar*, lua_pushstring);
-	LOAD_FUNCTION(varfuncvoid*, lua_pushvalue);
-	LOAD_FUNCTION(varfuncvoid*, lua_pushinteger);
-	LOAD_FUNCTION(varfuncvoid*, lua_pushcclosure);
-	LOAD_FUNCTION(varfuncchar*, lua_tolstring);
-	LOAD_FUNCTION(varfuncvoid*, lua_setfield);
-	LOAD_FUNCTION(varfuncvoid*, lua_getfield);
-	LOAD_FUNCTION(varfuncvoid*, lua_settop);
-	LOAD_FUNCTION(varfuncint*, lua_gettop);
-	LOAD_FUNCTION(varfuncint*, lua_type);
-	LOAD_FUNCTION(varfuncchar*, lua_typename);
-	LOAD_FUNCTION(varfuncvoid*, lua_createtable);
-	LOAD_FUNCTION(varfuncvoid*, lua_rawseti);
-
-	if (m_lua_ver == eLuaVersion::LUA_51)
+	if (isLua55())
 	{
-		LOAD_FUNCTION(varfuncvoid*, lua_call);
-		LOAD_FUNCTION(varfuncint*, lua_pcall);
-		LOAD_FUNCTION(varfuncint*, lua_tointeger);
+		LOAD_FUNCTION(varfuncvoid_t, luaL_openselectedlibs);
 	}
 	else
 	{
-		LOAD_FUNCTION(varfuncvoid*, lua_callk);
-		LOAD_FUNCTION(varfuncint*, lua_pcallk);
-		LOAD_FUNCTION(varfuncint*, lua_tointegerx);
-		LOAD_FUNCTION(varfuncvoid*, lua_setglobal);
-		LOAD_FUNCTION(varfuncvoid*, lua_getglobal);
+		LOAD_FUNCTION(varfuncvoid_t, luaL_openlibs);
+	}
+	if (isLua51())
+	{
+		LOAD_FUNCTION(varfuncvoid_t, lua_call);
+		LOAD_FUNCTION(varfuncint_t, lua_pcall);
+		LOAD_FUNCTION(varfuncint_t, lua_tointeger);
+	}
+	else
+	{
+		LOAD_FUNCTION(varfuncvoid_t, lua_callk);
+		LOAD_FUNCTION(varfuncint_t, lua_pcallk);
+		LOAD_FUNCTION(varfuncint_t, lua_tointegerx);
+		LOAD_FUNCTION(varfuncvoid_t, lua_setglobal);
+		LOAD_FUNCTION(varfuncvoid_t, lua_getglobal);
 	}
 
 	L = luaL_newstate();
-	luaL_openlibs(L);
+	do_load_libs(L); //luaL_openlibs(L);
 
 	//init_lua_functions
 	LUAREG(L, "msgbox", luafunc_msgbox);
@@ -248,12 +311,28 @@ void CLuaManager::reset_state()
 	LUAREG(L, "set_err_color", luafunc_set_err_color);
 	LUAREG(L, "set_ok_color", luafunc_set_ok_color);
 	LUAREG(L, "set_normal_color", luafunc_set_normal_color);
+	do_lua_getglobal(L, "string");
+	lua_pushcclosure(L, luafunc_string_to_utf8, 0);
+	lua_setfield(L, -2, "to_utf8");
+	lua_pushcclosure(L, luafunc_string_from_utf8, 0);
+	lua_setfield(L, -2, "from_utf8");
+	lua_pop(L, 1);
+}
+
+bool CLuaManager::isLua51() const noexcept
+{
+	return g_opt.GetLuaType() == eLuaVersion::LUA51 || g_opt.GetLuaType() == eLuaVersion::LUAJIT;
+}
+
+bool CLuaManager::isLua55() const noexcept
+{
+	// pluto since 0.12.0 work with luaL_openselectedlibs
+	return g_opt.GetLuaType() == eLuaVersion::LUA55 || g_opt.GetLuaType() == eLuaVersion::LUAPLUTO;
 }
 
 CLuaManager::~CLuaManager()
 {
 	destroy_state();
-	free_lib();
 }
 
 void CLuaManager::destroy_state()
@@ -263,10 +342,6 @@ void CLuaManager::destroy_state()
 		lua_close(L);
 		L = nullptr;
 	}
-}
-
-void CLuaManager::free_lib()
-{
 	if (hinstLib)
 	{
 		FreeLibrary(hinstLib);
@@ -274,17 +349,25 @@ void CLuaManager::free_lib()
 	}
 }
 
-bool CLuaManager::isFunction(void* State, int idx, const char* msg)
+bool CLuaManager::isFunction(void* State, int idx, const char* msg) const
 {
 	if (lua_type(State, idx) == 6 /*LUA_TFUNCTION*/) return true;
 	print_from_lua(msg, false);
 	return false;
 }
 
+void CLuaManager::do_load_libs(void* State)
+{
+	if (isLua55())
+		luaL_openselectedlibs(State, ~0, 0);
+	else
+		luaL_openlibs(State);
+}
+
 void CLuaManager::do_lua_call(void* State, int narg, int nret)
 {
 	if (!isFunction(State, -narg - 1, "try to call non function object")) return;
-	if (m_lua_ver == eLuaVersion::LUA_51)
+	if (isLua51())
 		lua_call(State, narg, nret);
 	else
 		lua_callk(State, narg, nret, 0, NULL);
@@ -293,7 +376,7 @@ void CLuaManager::do_lua_call(void* State, int narg, int nret)
 int CLuaManager::do_lua_pcall(void* State, int narg, int nret)
 {
 	if (!isFunction(State, -narg - 1, "try to pcall non function object")) return 0;
-	if (m_lua_ver == eLuaVersion::LUA_51)
+	if (isLua51())
 		return lua_pcall(State, narg, nret, 0);
 	else
 		return lua_pcallk(State, narg, nret, 0, 0, NULL);
@@ -301,7 +384,7 @@ int CLuaManager::do_lua_pcall(void* State, int narg, int nret)
 
 void CLuaManager::do_lua_getglobal(void* State, const char* name)
 {
-	if (m_lua_ver == eLuaVersion::LUA_51)
+	if (isLua51())
 		lua_getfield(State, LUA_GLOBALSINDEX, name);
 	else
 		lua_getglobal(State, name);
@@ -309,7 +392,7 @@ void CLuaManager::do_lua_getglobal(void* State, const char* name)
 
 void CLuaManager::do_lua_setglobal(void* State, const char* name)
 {
-	if (m_lua_ver == eLuaVersion::LUA_51)
+	if (isLua51())
 		lua_setfield(State, LUA_GLOBALSINDEX, name);
 	else
 		lua_setglobal(State, name);
@@ -317,7 +400,7 @@ void CLuaManager::do_lua_setglobal(void* State, const char* name)
 
 int CLuaManager::do_lua_tointeger(void* State, int idx)
 {
-	if (m_lua_ver == eLuaVersion::LUA_51)
+	if (isLua51())
 		return lua_tointeger(State, idx);
 	else
 		return lua_tointegerx(State, idx, 0);
@@ -347,11 +430,11 @@ if quote>0 then debug.sethook() end \
 if res then return -1, '' end \
 return (tonumber(err:match(':(%d+):')) or 1) - 1, err \
 end";
-	do_lua_getglobal(L, (m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
+	do_lua_getglobal(L, isLua51() ? "loadstring" : "load");
 	lua_pushstring(L, lua_code);
 	do_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring
 	do_lua_call(L, 0, 1); //
-	lua_pushinteger(L, g_opt.timequote);
+	lua_pushinteger(L, g_opt.m_timequote);
 	lua_pushstring(L, fpath);
 	do_lua_pcall(L, 2, 2); // call created function (2 arguments, 2 results)
 	int res = do_lua_tointeger(L, 1);
@@ -362,23 +445,45 @@ end";
 
 std::tuple<int, std::string> CLuaManager::validate(const char* fpath)
 {
+	reset_state();
 	if (!L) {
 		return { 0 , "Error:Lua not initialized!" };
 	}
 
-	const char lua_code[] = "\
-return function(fpath) \
-local res, err = loadfile(fpath) \
-if res then \
-	return -1, fpath .. ' - syntax OK\\n' \
-end \
-return (tonumber(err:match(':(%d+):')) or 1) - 1, err..'\\n' \
-end";
-
-	do_lua_getglobal(L, (m_lua_ver == eLuaVersion::LUA_51) ? "loadstring" : "load");
+	//	const char lua_code[] = "\
+	//return function(fpath) \
+	//local res, err = loadfile(fpath) \
+	//if res then \
+	//	return -1, fpath .. ' - syntax OK\\n' \
+	//end \
+	//return (tonumber(err:match(':(%d+):')) or 1) - 1, err..'\\n' \
+	//end";
+	//
+	//	do_lua_getglobal(L, isLua51() ? "loadstring" : "load");
+	//	lua_pushstring(L, lua_code);
+	//	//dump_stack(L);
+	//	do_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring
+	//	//dump_stack(L);
+	//	if (lua_type(L, 1) != 6) /* is not a function */
+	//	{
+	//		auto err_info = std::format("internal error (not a function): {}", lua_tolstring(L, -1, nullptr));
+	//		lua_settop(L, 0);
+	//		return { 0, err_info };
+	//	}
+	//	do_lua_call(L, 0, 1); // create lua function
+	//	lua_pushstring(L, fpath);
+		//dump_stack(L);
+	do_lua_getglobal(L, isLua51() ? "loadstring" : "load");
+	const char lua_code[] = "local args = {...} \
+		local fpath = args[1] \
+		local res, err = pcall(loadfile, fpath)\
+		if res then \
+			return -1, fpath .. ' - syntax OK\\n' \
+		end \
+		return (tonumber(err:match(':(%d+):')) or 1) - 1, err..'\\n'";
 	lua_pushstring(L, lua_code);
 	//dump_stack(L);
-	do_lua_call(L, 1, 1); // OK -> function + nil, not OK -> nil + errstring
+	do_lua_call(L, 1, 1);
 	//dump_stack(L);
 	if (lua_type(L, 1) != 6) /* is not a function */
 	{
@@ -386,10 +491,10 @@ end";
 		lua_settop(L, 0);
 		return { 0, err_info };
 	}
-	do_lua_call(L, 0, 1); // create lua function
 	lua_pushstring(L, fpath);
 	//dump_stack(L);
 	do_lua_pcall(L, 1, 2); // call created function
+	//dump_stack(L);
 	int line = do_lua_tointeger(L, 1);
 	std::string err_info = lua_tolstring(L, 2, nullptr);
 	lua_settop(L, 0);

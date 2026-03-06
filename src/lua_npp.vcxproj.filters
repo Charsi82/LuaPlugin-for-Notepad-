@@ -46,4 +46,7 @@
       <Filter>plugin</Filter>
     </ResourceCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="lua_icon16.ico" />
+  </ItemGroup>
 </Project>
