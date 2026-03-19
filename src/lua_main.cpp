@@ -476,7 +476,7 @@ std::tuple<int, std::string> CLuaManager::validate(const char* fpath)
 	do_lua_getglobal(L, isLua51() ? "loadstring" : "load");
 	const char lua_code[] = "local args = {...} \
 		local fpath = args[1] \
-		local res, err = pcall(loadfile, fpath)\
+		local res, err = loadfile(fpath)\
 		if res then \
 			return -1, fpath .. ' - syntax OK\\n' \
 		end \
